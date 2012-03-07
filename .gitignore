@@ -1,0 +1,5 @@
+bin/*
+deploy.fabfile.egg-info/*
+include/*
+lib/*
+local

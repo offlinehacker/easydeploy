@@ -13,7 +13,7 @@ def read(*rnames):
 
 version = '0.1.2dev'
 
-setup(name='niteoweb.fabfile',
+setup(name='deploy.fabfile',
       version=version,
       description="A bunch of Fabric commands we use all the time.",
       long_description=read('README') +
@@ -23,7 +23,7 @@ setup(name='niteoweb.fabfile',
         "Programming Language :: Python",
         ],
       keywords='Fabric Python',
-      author='NiteoWeb Ltd.',
+      author='NiteoWeb Ltd and @offlinehacker',
       author_email='info@niteoweb.com',
       url='http://www.niteoweb.com',
       license='BSD',
