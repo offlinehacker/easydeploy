@@ -13,7 +13,7 @@ def read(*rnames):
 
 version = '0.1.2dev'
 
-setup(name='deploy.fabfile',
+setup(name='easydeploy.fabfile',
       version=version,
       description="A bunch of Fabric commands we use all the time.",
       long_description=read('README') +
@@ -35,5 +35,6 @@ setup(name='deploy.fabfile',
           'Fabric',
           'cuisine',
           'setuptools',
+          'nose'
       ],
       )

@@ -1,13 +1,33 @@
 from fabric.api import env
 from fabric.api import sudo
+from fabric.api import task
 from fabric.contrib.console import confirm
 from fabric.contrib.files import append
 from fabric.contrib.files import exists
 from fabric.contrib.files import sed
 from fabric.contrib.files import uncomment
 from fabric.operations import prompt
-from niteoweb.fabfile import err
+from easydeploy.core import err
 
+@task
+def apt_get(pkg_name, repo=None):
+    """Install package"""
+    opts = dict(
+        pkg_name = pkg_name or env.pkg_name or err("env.pkg_name must be set"),
+        repo = repo or env.repo or None
+    )
+
+    if opts["repo"]:
+        sudo("apt-add-repository -y %(repo)s"% opts)
+
+    sudo("apt-get update")
+
+    if opts.pkg_name and isinstance(opts.pkg_name, (tuple, list, dict, set)):
+        sudo("apt-get -yq install %s", opts["pkg_name"].join(" "))
+    else:
+        sudo("apt-get -yq install %(pkg_name)", opts)
+
+@task
 def create_admin_accounts(admins=None, default_password=None):
     """Create admin accounts, so admins can access the server."""
     opts = dict(
@@ -23,7 +43,7 @@ def create_admin_accounts(admins=None, default_password=None):
                 "them that they must login and change their default password "
                 "(%(default_password)s) with the ``passwd`` command. Proceed?" % opts)
 
-
+@task
 def create_admin_account(admin, default_password=None):
     """Create an account for an admin to use to access the server."""
     opts = dict(
@@ -50,7 +70,7 @@ def create_admin_account(admin, default_password=None):
     # set default password for initial login
     sudo('echo "%(admin)s:%(default_password)s" | chpasswd' % opts)
 
-
+@task
 def harden_sshd():
     """Security harden sshd."""
 
@@ -66,13 +86,13 @@ def harden_sshd():
         'PermitRootLogin no',
         use_sudo=True)
 
-
+@task
 def install_ufw(rules=None):
     """Install and configure Uncomplicated Firewall."""
     sudo('apt-get -yq install ufw')
     configure_ufw(rules)
 
-
+@task
 def configure_ufw(rules=None):
     """Configure Uncomplicated Firewall."""
     # reset rules so we start from scratch
@@ -86,14 +106,14 @@ def configure_ufw(rules=None):
     sudo('ufw --force enable')
     sudo('ufw status verbose')
 
-
+@task
 def disable_root_login():
     """Disable `root` login for even more security. Access to `root` account
     is now possible by first connecting with your dedicated maintenance
     account and then running ``sudo su -``."""
     sudo('passwd --lock root')
 
-
+@task
 def set_hostname(server_ip=None, hostname=None):
     """Set server's hostname."""
     opts = dict(
@@ -105,7 +125,7 @@ def set_hostname(server_ip=None, hostname=None):
     sudo('echo "%(hostname)s" > /etc/hostname' % opts)
     sudo('hostname %(hostname)s' % opts)
 
-
+@task
 def set_system_time(timezone=None):
     """Set timezone and install ``ntp`` to keep time accurate."""
 
@@ -119,7 +139,7 @@ def set_system_time(timezone=None):
     # install NTP
     sudo('apt-get -yq install ntp')
 
-
+@task
 def install_system_libs(additional_libs=None):
     """Install a bunch of stuff we need for normal operation such as
     ``gcc``, ``rsync``, ``vim``, ``libpng``, etc."""
@@ -151,7 +171,7 @@ def install_system_libs(additional_libs=None):
              '%(additional_libs)s' % opts
              )
 
-
+@task
 def install_unattended_upgrades(email=None):
     """Configure Ubuntu to automatically install security updates."""
     opts = dict(

@@ -1,5 +1,7 @@
 bin/*
-deploy.fabfile.egg-info/*
+easydeploy.fabfile.egg-info/*
 include/*
 lib/*
 local
+*.pyc
+man/*

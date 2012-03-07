@@ -1,5 +1,6 @@
 from fabric.api import env
 from fabric.api import sudo
+from fabric.api import task
 from fabric.contrib.console import confirm
 from fabric.contrib.files import append
 from fabric.contrib.files import exists
@@ -9,12 +10,14 @@ from fabric.contrib.files import upload_template
 from fabric.context_managers import settings
 from fabric.operations import prompt
 from fabric.contrib.files import comment
-from niteoweb.fabfile import err
 from cuisine import dir_ensure
 from cuisine import mode_sudo
 
+from easydeploy.core import err
+
 import os
 
+@task
 def raid_monitoring(email=None):
     """Configure monitoring of our RAID-1 field. If anything goes wrong,
     send an email!"""
@@ -29,7 +32,7 @@ def raid_monitoring(email=None):
     sudo('apt-get -yq install smartmontools')
     uncomment('/etc/default/smartmontools', '#start_smartd=yes', use_sudo=True)
 
-
+@task
 def install_nginx(nginx_conf=None):
     """Install and configure Nginx webserver."""
 
@@ -39,7 +42,7 @@ def install_nginx(nginx_conf=None):
 
     configure_nginx()
 
-
+@task
 def configure_nginx(nginx_conf=None):
     """Upload Nginx configuration and restart Nginx so this configuration takes
     effect."""
@@ -50,7 +53,7 @@ def configure_nginx(nginx_conf=None):
     upload_template(opts['nginx_conf'], '/etc/nginx/nginx.conf', use_sudo=True)
     sudo('service nginx restart')
 
-
+@task
 def install_sendmail(email=None):
     """Prepare a localhost SMTP server for sending out system notifications
     to admins."""
@@ -64,7 +67,7 @@ def install_sendmail(email=None):
     # all email should be sent to maintenance email
     append('/etc/aliases', 'root:           %(email)s' % opts, use_sudo=True)
 
-
+@task
 def install_rkhunter(email=None):
     """Install and configure RootKit Hunter."""
     opts = dict(
@@ -83,7 +86,7 @@ def install_rkhunter(email=None):
     uncomment('/etc/rkhunter.conf', '#ALLOWHIDDENDIR=\/dev\/.static', use_sudo=True)
     uncomment('/etc/rkhunter.conf', '#ALLOWHIDDENDIR=\/dev\/.initramfs', use_sudo=True)
 
-
+@task
 def generate_selfsigned_ssl(hostname=None):
     """Generate self-signed SSL certificates and provide them to Nginx."""
     opts = dict(
@@ -101,7 +104,7 @@ def generate_selfsigned_ssl(hostname=None):
     sudo('cp server.crt /etc/nginx/certs/%(hostname)s.crt' % opts)
     sudo('cp server.key /etc/nginx/certs/%(hostname)s.key' % opts)
 
-
+@task
 def install_php():
     """Install FastCGI interface for running PHP scripts via Nginx."""
 
@@ -126,7 +129,7 @@ def install_php():
     # restart for changes to apply
     sudo('/etc/init.d/php5-fpm restart')
 
-
+@task
 def install_mysql(default_password=None):
     """Install MySQL database server."""
     opts = dict(
@@ -157,7 +160,7 @@ def install_mysql(default_password=None):
     password = prompt('Please enter your mysql root password so I can configure daily backups:')
     sudo("echo '0 7 * * * mysqldump -u root -p%s --all-databases | gzip > /var/backups/mysql/mysqldump_$(date +%%Y-%%m-%%d).sql.gz' > /etc/cron.d/mysqldump" % password)
 
-
+@task
 def install_munin_node(add_to_master=True):
     """Install and configure Munin node, which gathers system information
     and sends it to Munin master."""
@@ -180,14 +183,14 @@ def install_munin_node(add_to_master=True):
             append(path, '    address %(server_ip)s' % env, use_sudo=True)
             append(path, ' ', use_sudo=True)
 
-
+@task
 def install_postgres():
     """Install and configure Postgresql database server."""
     sudo('apt-get -yq install postgresql libpq-dev')
     configure_postgres()
     initialize_postgres()
 
-
+@task
 def configure_postgres():
     """Upload Postgres configuration from ``etc/`` and restart the server."""
 
@@ -212,7 +215,7 @@ def configure_postgres():
     # restart server
     sudo('/etc/init.d/postgresql-8.4 restart')
 
-
+@task
 def initialize_postgres():
     """Initialize the main database."""
     # temporarily allow root access from localhost
@@ -236,88 +239,7 @@ def initialize_postgres():
     comment('/etc/postgresql/8.4/main/pg_hba.conf', 'local all postgres ident', use_sudo=True)
     sudo('service postgresql-8.4 restart')
 
-
-def install_bacula_master():
-    """Install and configure Bacula Master."""
-    # Official repos only have version 5.0.1, we need 5.0.3
-    sudo('add-apt-repository ppa:mario-sitz/ppa')
-    sudo('apt-get update')
-    sudo('apt-get -yq install bacula-console bacula-director-pgsql bacula-sd-pgsql')
-    configure_bacula_master()
-
-def configure_bacula_master(path=None):
-    """Upload configuration files for Bacula Master."""
-    opts = dict(
-        path=path or env.get('path') or err('env.path must be set'),
-    )
-
-    upload_template('%(path)s/etc/bacula-dir.conf' % opts,
-                    '/etc/bacula/bacula-dir.conf',
-                    use_sudo=True)
-    upload_template('%(path)s/etc/pool_defaults.conf' % opts,
-                    '/etc/bacula/pool_defaults.conf',
-                    use_sudo=True)
-    upload_template('%(path)s/etc/pool_full_defaults.conf' % opts,
-                    '/etc/bacula/pool_full_defaults.conf',
-                    use_sudo=True)
-    upload_template('%(path)s/etc/pool_diff_defaults.conf' % opts,
-                    '/etc/bacula/pool_diff_defaults.conf',
-                    use_sudo=True)
-    upload_template('%(path)s/etc/pool_inc_defaults.conf' % opts,
-                    '/etc/bacula/pool_inc_defaults.conf',
-                    use_sudo=True)
-
-    sudo('service bacula-director restart')
-
-
-def install_bacula_client():
-    """Install and configure Bacula backup client, which listens for
-    instructions from Bacula master and backups critical data
-    when told to do so."""
-
-    # Official repos only have version 5.0.1, we need 5.0.3
-    sudo('add-apt-repository ppa:mario-sitz/ppa')
-    sudo('apt-get update')
-    sudo('apt-get -yq install bacula-fd')
-
-    # this folder is needed
-    with mode_sudo():
-        dir_ensure('/var/spool/bacula', recursive=True)
-
-    configure_bacula_client()
-
-
-def configure_bacula_client(path=None):
-    """Upload configuration for Bacula File Deamon (client)
-    and restart it."""
-    opts = dict(
-        path=path or env.get('path') or err('env.path must be set'),
-    )
-
-    upload_template('%(path)s/etc/bacula-fd.conf' % opts, '/etc/bacula/bacula-fd.conf', use_sudo=True)
-    sudo('service bacula-fd restart')
-
-
-def add_to_bacula_master(shortname=None, path=None, bacula_host_string=None):
-    """Add this server's Bacula client configuration to Bacula master."""
-    opts = dict(
-        shortname=shortname or env.get('shortname') or err('env.shortname must be set'),
-        path=path or env.get('path') or err('env.path must be set'),
-        bacula_host_string=bacula_host_string or env.get('bacula_host_string') or err('env.bacula_host_string must be set')
-    )
-
-    with settings(host_string=opts['bacula_host_string']):
-
-        # upload project-specific configuration
-        upload_template(
-            '%s/etc/bacula-master.conf' % opts,
-            '/etc/bacula/clients/%(shortname)s.conf' % opts,
-            use_sudo=True)
-
-        # reload bacula master configuration
-        sudo("service bacula-director restart")
-
-
+@task
 def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
     """Hetzner gives us 100GB of backup storage. Let's use it with
     Duplicity to backup the whole disk."""
