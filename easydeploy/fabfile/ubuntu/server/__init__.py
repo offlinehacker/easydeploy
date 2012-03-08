@@ -14,6 +14,7 @@ from cuisine import dir_ensure
 from cuisine import mode_sudo
 
 from easydeploy.core import err
+from easydeploy.fabfile.ubuntu.core import apt_get
 
 import os
 
@@ -29,16 +30,13 @@ def raid_monitoring(email=None):
     append('/etc/mdadm/mdadm.conf', 'MAILADDR %(email)s' % opts, use_sudo=True)
 
     # enable email notification for SMART disk monitoring
-    sudo('apt-get -yq install smartmontools')
+    apt_get('smartmontools')
     uncomment('/etc/default/smartmontools', '#start_smartd=yes', use_sudo=True)
 
 @task
 def install_nginx(nginx_conf=None):
     """Install and configure Nginx webserver."""
-
-    sudo('add-apt-repository ppa:nginx/stable')
-    sudo('apt-get update')
-    sudo('apt-get -yq install nginx')
+    apt_get("ngingx", "ppa:nginx/stable")
 
     configure_nginx()
 
@@ -62,7 +60,7 @@ def install_sendmail(email=None):
     )
 
     # install sendmail
-    sudo('apt-get -yq install sendmail')
+    apt_get('sendmail')
 
     # all email should be sent to maintenance email
     append('/etc/aliases', 'root:           %(email)s' % opts, use_sudo=True)
@@ -75,7 +73,7 @@ def install_rkhunter(email=None):
     )
 
     # install RKHunter
-    sudo('apt-get -yq install rkhunter')
+    apt_get('rkhunter')
 
     # send emails on warnings
     uncomment('/etc/rkhunter.conf', '#MAIL-ON-WARNING=me@mydomain   root@mydomain', use_sudo=True)
@@ -108,12 +106,8 @@ def generate_selfsigned_ssl(hostname=None):
 def install_php():
     """Install FastCGI interface for running PHP scripts via Nginx."""
 
-    # add aditional repositories so we can install php5-fpm
-    sudo('add-apt-repository ppa:brianmercer/php')
-    sudo('apt-get update')
-
     # install php-fpm, php process manager
-    sudo('apt-get -yq install php5-fpm php5-curl php5-mysql php5-gd')
+    apt_get(['php5-fpm', 'php5-curl', 'php5-mysql', 'php5-gd'], 'ppa:brianmercer/php')
 
     # the command above also pulls in apache, which we cannot remove -> make id not start at bootup
     sudo('update-rc.d -f apache2 remove')
@@ -142,7 +136,7 @@ def install_mysql(default_password=None):
     sudo('echo "mysql-server-5.0 mysql-server/root_password_again password %(default_password)s" | debconf-set-selections' % opts)
 
     # install MySQL along with php drivers for it
-    sudo('sudo apt-get -yq install mysql-server mysql-client')
+    apt_get('mysql-server mysql-client')
 
     if not env.get('confirm'):
         confirm("You will now start with interactive MySQL secure installation."
@@ -166,7 +160,7 @@ def install_munin_node(add_to_master=True):
     and sends it to Munin master."""
 
     # install munin-node
-    sudo('apt-get -yq install munin-node')
+    apt_get('munin-node')
 
     # add allow IP to munin-node.conf -> allow IP must be escaped REGEX-style
     ip = '%(hq)s' % env
@@ -249,7 +243,7 @@ def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
     )
 
     # install duplicity and dependencies
-    sudo('apt-get -yq install duplicity ncftp')
+    apt_get('duplicity ncftp')
 
     # what to exclude
     upload_template(opts['duplicityfilelist'], '/etc/duplicityfilelist.conf', use_sudo=True)

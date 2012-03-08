@@ -58,8 +58,13 @@ def create_admin_account(admin, default_password=None):
     if not exists('/home/%(admin)s/.ssh' % opts):
         sudo('mkdir /home/%(admin)s/.ssh' % opts)
 
-    opts['pub'] = prompt("Paste %(admin)s's public key: " % opts)
-    sudo("echo '%(pub)s' > /home/%(admin)s/.ssh/authorized_keys" % opts)
+    opts['pub'] = prompt("Paste %(admin)s's public key or leave alone: " % opts)
+    if opts['pub']:
+        sudo("echo '%(pub)s' > /home/%(admin)s/.ssh/authorized_keys" % opts)
+
+    opts['priv'] = prompt("Paste %(admin)s's private key or leave alone: " % opts)
+    if opts['priv']:
+        sudo("echo '%(priv)s' > /home/%(admin)s/.ssh/id_rsa" % opts)
 
     # allow this user in sshd_config
     append("/etc/ssh/sshd_config", 'AllowUsers %(admin)s@*' % opts, use_sudo=True)
