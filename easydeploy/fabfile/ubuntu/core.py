@@ -7,7 +7,9 @@ from fabric.contrib.files import exists
 from fabric.contrib.files import sed
 from fabric.contrib.files import uncomment
 from fabric.operations import prompt
+
 from easydeploy.core import err
+from easydeploy.core import upload_template_jinja2
 
 @task
 def apt_get(pkg_name, repo=None):
@@ -95,8 +97,7 @@ def harden_sshd():
 @task
 def install_ufw(rules=None):
     """Install and configure Uncomplicated Firewall."""
-    sudo('apt-get -yq install ufw')
-    configure_ufw(rules)
+    apt_get('ufw')
 
 @task
 def configure_ufw(rules=None):
@@ -143,7 +144,7 @@ def set_system_time(timezone=None):
     sudo('cp %(timezone)s /etc/localtime' % opts)
 
     # install NTP
-    sudo('apt-get -yq install ntp')
+    apt_get('ntp')
 
 @task
 def install_system_libs(additional_libs=None):
@@ -184,7 +185,7 @@ def install_unattended_upgrades(email=None):
         email=email or env.get('email') or err('env.email must be set'),
     )
 
-    sudo('apt-get -yq install unattended-upgrades')
+    apt_get('unattended-upgrades')
     sed('/etc/apt/apt.conf.d/50unattended-upgrades',
         '//Unattended-Upgrade::Mail "root@localhost";',
         'Unattended-Upgrade::Mail "%(email)s";' % opts,
@@ -203,3 +204,12 @@ def install_unattended_upgrades(email=None):
     append('/etc/apt/apt.conf.d/10periodic',
            'APT::Periodic::Unattended-Upgrade "1";',
            use_sudo=True)
+
+@task
+def install_network_config(path=None):
+    opts = dict(
+            path=path or env.get("path") or err('env.path must be set')
+            )
+
+    upload_template_jinja2("%(path)/etc/network/interfaces" % opts,
+                           "/etc/network/interfaces")
