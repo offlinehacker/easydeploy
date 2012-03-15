@@ -6,7 +6,6 @@ from fabric.contrib.files import append
 from fabric.contrib.files import exists
 from fabric.contrib.files import sed
 from fabric.contrib.files import uncomment
-from fabric.contrib.files import upload_template
 from fabric.context_managers import settings
 from fabric.operations import prompt
 from fabric.contrib.files import comment
@@ -14,6 +13,7 @@ from cuisine import dir_ensure
 from cuisine import mode_sudo
 
 from easydeploy.core import err
+from easydeploy.core import upload_template_jinja2
 from easydeploy.fabfile.ubuntu.core import apt_get
 
 import os
@@ -48,7 +48,7 @@ def configure_nginx(nginx_conf=None):
         nginx_conf=nginx_conf or env.get('nginx_conf') or '%s/etc/nginx.conf' % os.getcwd(),
     )
 
-    upload_template(opts['nginx_conf'], '/etc/nginx/nginx.conf', use_sudo=True)
+    upload_template_jinja2(opts['nginx_conf'], '/etc/nginx/nginx.conf', use_sudo=True)
     sudo('service nginx restart')
 
 @task
@@ -234,6 +234,20 @@ def initialize_postgres():
     sudo('service postgresql-8.4 restart')
 
 @task
+def install_avahi(path=None):
+    opts = dict( 
+        path = path or env.get("path") or err("env.path must be set")
+    )
+
+    apt_get("avahi-daemon")
+
+    upload_template_jinja2("%(path)s/etc/avahi/avahi-daemon.conf" % opts,
+                    "/etc/avahi/avahi-daemon.conf")
+    #Allow other domains
+    upload_template_jinja2("%(path)s/etc/mdns.allow" % opts,
+                    "/etc/mdns.allow")
+
+@task
 def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
     """Hetzner gives us 100GB of backup storage. Let's use it with
     Duplicity to backup the whole disk."""
@@ -246,10 +260,10 @@ def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
     apt_get('duplicity ncftp')
 
     # what to exclude
-    upload_template(opts['duplicityfilelist'], '/etc/duplicityfilelist.conf', use_sudo=True)
+    upload_template_jinja2(opts['duplicityfilelist'], '/etc/duplicityfilelist.conf', use_sudo=True)
 
     # script for running Duplicity
-    upload_template(opts['duplicitysh'], '/usr/sbin/duplicity.sh', use_sudo=True)
+    upload_template_jinja2(opts['duplicitysh'], '/usr/sbin/duplicity.sh', use_sudo=True)
     sudo('chmod +x /usr/sbin/duplicity.sh')
 
     # cronjob
