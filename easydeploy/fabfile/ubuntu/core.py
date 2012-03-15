@@ -13,19 +13,20 @@ from easydeploy.core import err
 def apt_get(pkg_name, repo=None):
     """Install package"""
     opts = dict(
-        pkg_name = pkg_name or env.pkg_name or err("env.pkg_name must be set"),
-        repo = repo or env.repo or None
+        pkg_name = pkg_name or env.get("pkg_name") or err("env.pkg_name must be set"),
+        repo = repo or env.get("repo") or None
     )
 
     if opts["repo"]:
         sudo("apt-add-repository -y %(repo)s"% opts)
 
-    sudo("apt-get update")
+    if repo:
+        sudo("apt-get update")
 
-    if opts.pkg_name and isinstance(opts.pkg_name, (tuple, list, dict, set)):
+    if isinstance(opts["pkg_name"], (tuple, list, dict, set)):
         sudo("apt-get -yq install %s", opts["pkg_name"].join(" "))
     else:
-        sudo("apt-get -yq install %(pkg_name)", opts)
+        sudo("apt-get -yq install %(pkg_name)s" % opts)
 
 @task
 def create_admin_accounts(admins=None, default_password=None):

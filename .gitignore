@@ -5,3 +5,4 @@ lib/*
 local
 *.pyc
 man/*
+easydeploy/fabfile/.ropeproject/*

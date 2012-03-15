@@ -6,7 +6,6 @@ from fabric.contrib.files import append
 from fabric.contrib.files import exists
 from fabric.contrib.files import sed
 from fabric.contrib.files import uncomment
-from fabric.contrib.files import upload_template
 from fabric.context_managers import settings
 from fabric.operations import prompt
 from fabric.contrib.files import comment
@@ -14,6 +13,7 @@ from cuisine import dir_ensure
 from cuisine import mode_sudo
 
 from easydeploy.core import err
+from easydeploy.core import upload_template_jinja2
 
 import os
 
@@ -33,19 +33,19 @@ def configure_bacula_master(path=None):
         path=path or env.get('path') or err('env.path must be set'),
     )
 
-    upload_template('%(path)s/etc/bacula-dir.conf' % opts,
+    upload_template_jinja2('%(path)s/etc/bacula-dir.conf' % opts,
                     '/etc/bacula/bacula-dir.conf',
                     use_sudo=True)
-    upload_template('%(path)s/etc/pool_defaults.conf' % opts,
+    upload_template_jinja2('%(path)s/etc/pool_defaults.conf' % opts,
                     '/etc/bacula/pool_defaults.conf',
                     use_sudo=True)
-    upload_template('%(path)s/etc/pool_full_defaults.conf' % opts,
+    upload_template_jinja2('%(path)s/etc/pool_full_defaults.conf' % opts,
                     '/etc/bacula/pool_full_defaults.conf',
                     use_sudo=True)
-    upload_template('%(path)s/etc/pool_diff_defaults.conf' % opts,
+    upload_template_jinja2('%(path)s/etc/pool_diff_defaults.conf' % opts,
                     '/etc/bacula/pool_diff_defaults.conf',
                     use_sudo=True)
-    upload_template('%(path)s/etc/pool_inc_defaults.conf' % opts,
+    upload_template_jinja2('%(path)s/etc/pool_inc_defaults.conf' % opts,
                     '/etc/bacula/pool_inc_defaults.conf',
                     use_sudo=True)
 
@@ -76,7 +76,7 @@ def configure_bacula_client(path=None):
         path=path or env.get('path') or err('env.path must be set'),
     )
 
-    upload_template('%(path)s/etc/bacula-fd.conf' % opts, '/etc/bacula/bacula-fd.conf', use_sudo=True)
+    upload_template_jinja2('%(path)s/etc/bacula-fd.conf' % opts, '/etc/bacula/bacula-fd.conf', use_sudo=True)
     sudo('service bacula-fd restart')
 
 @task
@@ -91,7 +91,7 @@ def add_to_bacula_master(shortname=None, path=None, bacula_host_string=None):
     with settings(host_string=opts['bacula_host_string']):
 
         # upload project-specific configuration
-        upload_template(
+        upload_template_jinja2(
             '%s/etc/bacula-master.conf' % opts,
             '/etc/bacula/clients/%(shortname)s.conf' % opts,
             use_sudo=True)

@@ -7,19 +7,19 @@ from fabric.contrib.files import append
 from fabric.contrib.files import exists
 from fabric.contrib.files import sed
 from fabric.contrib.files import uncomment
-from fabric.contrib.files import upload_template
 from fabric.operations import prompt
 from cuisine import dir_ensure
 
 from easydeploy.core import err
+from easydeploy.core import upload_template_jinja2
 
 import core
 
 @task
-def install_badvpn(cert_folder=None, path=None):
+def install_badvpn(path=None):
     """Installs and configures badvpn client and server"""
     opts= dict(
-            cert_folder = cert_folder or "/etc/badvpn/nssdb",
+            cert_folder = "/etc/badvpn/nssdb",
             path=path or env.get('path') or err('env.path must be set')
             )
 
@@ -29,13 +29,15 @@ def install_badvpn(cert_folder=None, path=None):
 
     """Install all configs"""
     sudo("cp /etc/init.d/badvpn-server /etc/init.d/badvpn-client")
-    upload_template("%(path)s/etc/init/badvpn-client" % opts,
+    upload_template_jinja2("%(path)s/etc/init/badvpn-client" % opts,
              "/etc/init/badvpn-client", use_sudo=True)
     dir_ensure(opts["cert_folder"], recursive=True)
-    upload_template("%(path)s/etc/default/badvpn-client" % opts,
-             "/etc/default/badvpn-client", use_sudo=True)
-    upload_template("%(path)s/etc/init/badvpn-server" % opts,
-             "/etc/default/badvpn-server", use_sudo=True)
+    upload_template_jinja2("%(path)s/etc/badvpn/badvpn-client" % opts,
+             "/etc/badvpn/badvpn-client", use_sudo=True)
+    sudo("ln -s /etc/badvpn/badvpn-client /etc/default/badvpn-client")
+    upload_template_jinja2("%(path)s/etc/badvpn/badvpn-server" % opts,
+             "/etc/badvpn/badvpn-server", use_sudo=True)
+    sudo("ln -s /etc/badvpn/badvpn-server /etc/default/badvpn-server")
 
     """Create cert database"""
     put("%(path)s/ca.pem" % opts, "~/")
