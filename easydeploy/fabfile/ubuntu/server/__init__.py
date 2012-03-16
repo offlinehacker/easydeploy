@@ -15,6 +15,7 @@ from cuisine import mode_sudo
 from easydeploy.core import err
 from easydeploy.core import upload_template_jinja2
 from easydeploy.fabfile.ubuntu.core import apt_get
+from easydeploy.fabfile.ubuntu.core import add_startup
 
 import os
 
@@ -37,18 +38,18 @@ def raid_monitoring(email=None):
 def install_nginx(nginx_conf=None):
     """Install and configure Nginx webserver."""
     apt_get("ngingx", "ppa:nginx/stable")
-
-    configure_nginx()
+    add_startup("nginx")
 
 @task
-def configure_nginx(nginx_conf=None):
+def configure_nginx(path=None):
     """Upload Nginx configuration and restart Nginx so this configuration takes
     effect."""
     opts = dict(
-        nginx_conf=nginx_conf or env.get('nginx_conf') or '%s/etc/nginx.conf' % os.getcwd(),
+        path=path or env.get('path') or err("env.path must be set"),
     )
 
-    upload_template_jinja2(opts['nginx_conf'], '/etc/nginx/nginx.conf', use_sudo=True)
+    upload_template_jinja2("%(path)s/etc/nignx/nginx.conf" % opts, 
+            '/etc/nginx/nginx.conf', use_sudo=True)
     sudo('service nginx restart')
 
 @task
@@ -64,6 +65,24 @@ def install_sendmail(email=None):
 
     # all email should be sent to maintenance email
     append('/etc/aliases', 'root:           %(email)s' % opts, use_sudo=True)
+
+
+@task
+def install_dnsmasq():
+    """Installs local dns server"""
+    apt_get("dnsmasq")
+    add_startup("dnsmasq")
+
+@task
+def configure_dnsmasq(path=None):
+    """Configures local dns server"""
+    opts = dict(
+        path=path or env.get('path') or err("env.path must be set"),
+    )
+
+    upload_template_jinja2("%(path)s/etc/dnsmasq.con" % opts, 
+            '/etc/dnsmasq.conf', use_sudo=True)
+    sudo('service nginx restart')
 
 @task
 def install_rkhunter(email=None):
@@ -234,18 +253,25 @@ def initialize_postgres():
     sudo('service postgresql-8.4 restart')
 
 @task
-def install_avahi(path=None):
+def install_avahi():
+    """Installs avahi for mdns support"""
+    apt_get("avahi-daemon")
+    add_startup("avahi-daemon")
+
+@task
+def configure_avahi(path=None):
+    """Configure avahi for mdns support"""
     opts = dict( 
         path = path or env.get("path") or err("env.path must be set")
     )
-
-    apt_get("avahi-daemon")
 
     upload_template_jinja2("%(path)s/etc/avahi/avahi-daemon.conf" % opts,
                     "/etc/avahi/avahi-daemon.conf")
     #Allow other domains
     upload_template_jinja2("%(path)s/etc/mdns.allow" % opts,
                     "/etc/mdns.allow")
+
+    sudo("service avahi-daemon restart")
 
 @task
 def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
