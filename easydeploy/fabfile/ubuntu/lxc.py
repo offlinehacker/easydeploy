@@ -13,16 +13,23 @@ from cuisine import dir_ensure
 
 from easydeploy.core import err
 from core import apt_get
+from core import add_startup
 
 import core
 
 @task
 def install_lxc():
+    """Installs LXC"""
     apt_get("lxc vlan bridge-utils")
     uncomment('/etc/default/lxc', '#RUN=yes', use_sudo=True)
+    add_startup("lxc")
 
 @task
 def create_instance(name=None, template=None, config=None, autostart=None):
+    """
+    Creates new lxc instance. 
+    Params: name, template, config, autostart
+    """
     opts = dict(
             name=name or env.get("name") or err("env.name must be set"),
             template=template or env.get("template") or "ubuntu",
@@ -40,6 +47,10 @@ def create_instance(name=None, template=None, config=None, autostart=None):
 
 @task
 def destroy_instance(name=None):
+    """
+    Destroys lxc instance.
+    Params: name
+    """
     opts = dict(
             name=name or env.get("name") or err("env.name must be set")
             )
@@ -51,6 +62,10 @@ def destroy_instance(name=None):
 
 @task
 def toggle_bootstart(name=None):
+    """
+    Toggles bootstart of lxc instance.
+    Params: name
+    """
     opts = dict(
             name=name or env.get("name") or err("env.name must be set")
             )

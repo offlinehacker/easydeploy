@@ -26,9 +26,22 @@ def apt_get(pkg_name, repo=None):
         sudo("apt-get update")
 
     if isinstance(opts["pkg_name"], (tuple, list, dict, set)):
-        sudo("apt-get -yq install %s", opts["pkg_name"].join(" "))
+        sudo("apt-get -yq install", opts["pkg_name"].join(" "))
     else:
         sudo("apt-get -yq install %(pkg_name)s" % opts)
+
+@task
+def add_startup(service=None):
+    """Adds service to startup"""
+    opts = dict(
+        service=service or env.get("service") or err("env.service must be set")
+        )
+
+    if isinstance(opts["sevice"], (tuple, list, dict, set)):
+        for service in opts["service"]:
+            sudo("update-rc.d %s defaults", service)
+    else:
+        sudo("update-rc.d %(service)s defaults" % opts)
 
 @task
 def create_admin_accounts(admins=None, default_password=None):
