@@ -1,30 +1,18 @@
 from fabric.api import env
 from fabric.api import sudo
 from fabric.api import task
-from fabric.contrib.console import confirm
-from fabric.contrib.files import append
-from fabric.contrib.files import exists
-from fabric.contrib.files import sed
-from fabric.contrib.files import uncomment
 from fabric.context_managers import settings
-from fabric.operations import prompt
-from fabric.contrib.files import comment
 from cuisine import dir_ensure
 from cuisine import mode_sudo
 
 from easydeploy.core import err
 from easydeploy.core import upload_template_jinja2
-
-import os
+from core import apt_get
 
 @task
 def install_bacula_master():
     """Install and configure Bacula Master."""
-    # Official repos only have version 5.0.1, we need 5.0.3
-    sudo('add-apt-repository ppa:mario-sitz/ppa')
-    sudo('apt-get update')
-    sudo('apt-get -yq install bacula-console bacula-director-pgsql bacula-sd-pgsql')
-    configure_bacula_master()
+    apt_get('bacula-console bacula-director-pgsql bacula-sd-pgsql')
 
 @task
 def configure_bacula_master(path=None):
@@ -38,16 +26,16 @@ def configure_bacula_master(path=None):
                     use_sudo=True)
     upload_template_jinja2('%(path)s/etc/pool_defaults.conf' % opts,
                     '/etc/bacula/pool_defaults.conf',
-                    use_sudo=True)
+                use_sudo=True)
     upload_template_jinja2('%(path)s/etc/pool_full_defaults.conf' % opts,
-                    '/etc/bacula/pool_full_defaults.conf',
-                    use_sudo=True)
+                '/etc/bacula/pool_full_defaults.conf',
+                use_sudo=True)
     upload_template_jinja2('%(path)s/etc/pool_diff_defaults.conf' % opts,
-                    '/etc/bacula/pool_diff_defaults.conf',
-                    use_sudo=True)
+                '/etc/bacula/pool_diff_defaults.conf',
+                use_sudo=True)
     upload_template_jinja2('%(path)s/etc/pool_inc_defaults.conf' % opts,
-                    '/etc/bacula/pool_inc_defaults.conf',
-                    use_sudo=True)
+                '/etc/bacula/pool_inc_defaults.conf',
+                use_sudo=True)
 
     sudo('service bacula-director restart')
 
@@ -57,16 +45,11 @@ def install_bacula_client():
     instructions from Bacula master and backups critical data
     when told to do so."""
 
-    # Official repos only have version 5.0.1, we need 5.0.3
-    sudo('add-apt-repository ppa:mario-sitz/ppa')
-    sudo('apt-get update')
-    sudo('apt-get -yq install bacula-fd')
+    apt_get('bacula-fd')
 
     # this folder is needed
     with mode_sudo():
         dir_ensure('/var/spool/bacula', recursive=True)
-
-    configure_bacula_client()
 
 @task
 def configure_bacula_client(path=None):
@@ -92,7 +75,7 @@ def add_to_bacula_master(shortname=None, path=None, bacula_host_string=None):
 
         # upload project-specific configuration
         upload_template_jinja2(
-            '%s/etc/bacula-master.conf' % opts,
+            '%(path)s/etc/bacula-master.conf' % opts,
             '/etc/bacula/clients/%(shortname)s.conf' % opts,
             use_sudo=True)
 
