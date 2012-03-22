@@ -297,3 +297,21 @@ def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
 
     if not env.get('confirm'):
         confirm("You need to manually run a full backup first time. Noted?")
+
+@task
+def install_aiccu():
+    "Installs aiccu. Hartbeat monitor for sixxs ipv6 tunnel"
+
+    apt_get("aiccu")
+
+@task
+def configure_aiccu(path=None):
+    "Configures aiccu. Hartbeat monitor for sixxs ipv6 tunnel"
+    opts = dict(
+        path=path or env.get('path') or err("env.path must be set"),
+    )
+
+    upload_template_jinja2("%(path)s/etc/aiccu.conf" % opts, "/etc/aiccu.conf")
+    sudo("/etc/init.d/aiccu restart")
+    sudo("update-rc.d aiccu defaults")
+
