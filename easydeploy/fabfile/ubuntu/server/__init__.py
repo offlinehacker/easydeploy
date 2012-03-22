@@ -267,9 +267,14 @@ def configure_avahi(path=None):
 
     upload_template_jinja2("%(path)s/etc/avahi/avahi-daemon.conf" % opts,
                     "/etc/avahi/avahi-daemon.conf")
+
     #Allow other domains
     upload_template_jinja2("%(path)s/etc/mdns.allow" % opts,
                     "/etc/mdns.allow")
+
+    #For ipv6 mdns support
+    upload_template_jinja2("%(path)s/etc/nsswitch.conf" % opts,
+                    "/etc/nsswitch.conf")
 
     sudo("service avahi-daemon restart")
 
