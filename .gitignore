@@ -6,3 +6,7 @@ local
 *.pyc
 man/*
 easydeploy/fabfile/.ropeproject/*
+
+#eclipse
+.project
+.pydevproject
