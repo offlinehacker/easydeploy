@@ -73,3 +73,10 @@ def decpass(key, keypass=None):
     RC4= ARC4.new(opts["keypass"])
     RC4.decrypt(md5.new(opts["keypass"]).digest())
     return RC4.decrypt(key)
+
+class taskdeps(object):
+    def __init__(self, depends=None, provides=None):
+        pass
+
+    def __call__(self, fn):
+        pass
