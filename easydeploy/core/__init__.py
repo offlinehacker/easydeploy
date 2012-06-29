@@ -1,8 +1,13 @@
 import md5
+import sys
 
 from Crypto.Cipher import ARC4
 from fabric.api import env
 from fabric.contrib.files import upload_template
+from fabric.utils import abort
+from fabric.utils import warn
+from fabric.utils import error
+from fabric.contrib.console import confirm
 
 def err(msg):
     """
@@ -74,9 +79,63 @@ def decpass(key, keypass=None):
     RC4.decrypt(md5.new(opts["keypass"]).digest())
     return RC4.decrypt(key)
 
-class taskdeps(object):
-    def __init__(self, depends=None, provides=None):
-        pass
+class state(object):
+    """
+    Decorator for handling states and its errors.
+
+    Set ``env.state_warn_only`` to only warn about failed state.
+    Set ``env.state_ask`` if you want to be asked if you want to continue on
+    failed state.
+
+    ``env.state`` list tells which states for wich hosts are already provided,
+    if ``env.state_skip`` is set tasks gets skipped when provided states are
+    in env.state list.
+
+        @state(provides=['nginx.nginx','nginx.config'],depends=['apt.update'])
+        def nginx():
+            apt-get("install nging")
+
+        ...
+
+    """
+
+    def __init__(self, provides=None, depends=None):
+        self.depends = depends
+        self.provides = provides
 
     def __call__(self, fn):
-        pass
+        def wrapper(*args):
+            if not hasattr(env,"state"):
+                env.state={}
+            if not env.state[env.host]:
+                env.state[env.host]=[]
+
+            if not all(x in env.state for x in self.depends):
+                if hasattr(env,"state_warn_only") and env.state_warn_only:
+                    warn("Not all dependencies satisfied for task %s.%s \
+                    providing %s" % (fn.__module__,fn.__name__, self.provides) )
+
+                    if hasattr(env,"state_ask") and env.state_ask:
+                        if not confirm("Do you want to continue with deploy?"):
+                            abort("Deploy for host %s stopped" % (env.host,))
+
+                else:
+                    error("Not all dependencies satisfied for task %s.%s \
+                    providing %s" % (fn.__module__,fn.__name__, self.provides) )
+
+            try:
+                fn(*args)
+            except:
+                if hasattr(env,"state_warn_only") and env.state_warn_only:
+                    warn("Problems running task %s.%s"
+                         % (fn.__module__, fn.__name_))
+
+                else:
+                    raise
+
+            if isinstance(self.depends, basestring):
+               env.state[env.host]+= [self.provides,]
+            else:
+               env.state[env.host]+= self.provides
+
+        return wrapper
