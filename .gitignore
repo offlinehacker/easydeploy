@@ -10,3 +10,6 @@ easydeploy/fabfile/.ropeproject/*
 #eclipse
 .project
 .pydevproject
+
+#vim
+tags
