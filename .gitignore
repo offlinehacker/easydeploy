@@ -1,2 +1,12 @@
+bin/*
+easydeploy.fabfile.egg-info/*
+include/*
+lib/*
+local
+*.pyc
+man/*
+easydeploy/fabfile/.ropeproject/*
+
+#eclipse
 .project
 .pydevproject
