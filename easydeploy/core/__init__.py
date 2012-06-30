@@ -164,3 +164,7 @@ class state(object):
 
         wrapper.func_name = fn.func_name
         return wrapper
+
+
+def execute_tasks(tasks):
+    pass
