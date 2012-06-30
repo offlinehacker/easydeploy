@@ -8,7 +8,7 @@ from fabric.api import execute
 from easydeploy.core import state, execute_tasks
 
 if hasattr(env,"show_all") and env.show_all:
-    import easydeploy.templates
+    import easydeploy.tasks
 
 env.hosts = ["127.0.0.1"]
 
@@ -20,7 +20,7 @@ env.state_skip = True
 
 basic={
        "tasks": [
-                 {"easydeploy.templates.ubuntu.core":
+                 {"easydeploy.tasks.ubuntu.core":
                                 [
                                  "apt_update",
                                  "apt_upgrade",
@@ -40,7 +40,7 @@ def deploy_basic():
 
 server_basic={
        "tasks": [
-                 {"easydeploy.templates.ubuntu.core":
+                 {"easydeploy.tasks.ubuntu.core":
                                 [
                                  "install_unattended_upgrades",
                                  "harden_sshd",
