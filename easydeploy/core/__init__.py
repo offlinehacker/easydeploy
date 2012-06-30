@@ -6,6 +6,7 @@ from fabric.contrib.files import upload_template
 from fabric.utils import abort
 from fabric.utils import warn
 from fabric.utils import error
+from fabric.utils import puts
 from fabric.contrib.console import confirm
 
 def err(msg):
@@ -82,12 +83,11 @@ class state(object):
     """
     Decorator for handling states and its errors.
 
-    Set ``env.state_warn_only`` to only warn about failed state.
-    Set ``env.state_ask`` if you want to be asked if you want to continue on
+    * Set ``env.state_warn_only`` to only warn about failed state.
+    * Set ``env.state_ask`` if you want to be asked if you want to continue on
     failed state.
-
-    ``env.state`` list tells which states for wich hosts are already provided,
-    if ``env.state_skip`` is set tasks gets skipped when provided states are
+    * ``env.state`` list tells which states for which hosts are already provided,
+    * if ``env.state_skip`` is set tasks gets skipped when provided states are
     in env.state list.
 
         @state(provides=['nginx.nginx','nginx.config'],depends=['apt.update'])
@@ -98,12 +98,12 @@ class state(object):
 
     """
 
-    def __init__(self, provides=None, depends=None):
-        self.depends = depends if depends != None else []
-        self.provides = provides if provides != None else []
+    def __init__(self, provides=[], depends=[]):
+        self.depends = depends if not isinstance(depends,basestring) else [depends]
+        self.provides = provides if not isinstance(provides,basestring) else [provides]
 
     def __call__(self, fn):
-
+        self.fn=fn
         def wrapper(*args):
             continoueFlag = 1
             # add state dictionary (happens first time only)
@@ -113,21 +113,28 @@ class state(object):
             if not env.state.has_key(env.host):
                 env.state[env.host]=[]
             
+            # Check if task should be skipped if it is already provided 
+            # with what state provides
+            if hasattr(env,"state_skip") and env.state_skip:
+                if all(x in env.state[env.host] for x in self.provides):
+                    puts("This task has already been executed, so we decide to skip it")
+                    return
+            
             # check that all dependences are installed
             if not all(x in env.state[env.host] for x in self.depends):
                 # if state_warn_only is set skip that package
                 if hasattr(env,"state_warn_only") and env.state_warn_only:
                     continoueFlag = 0
-                    warn("Not all dependencies satisfied for task %s.%s \
-providing %s" % (fn.__module__,fn.__name__, self.provides) )
+                    warn("Not all dependencies satisfied for task %s.%s"
+                         " providing %s" % (fn.__module__,fn.__name__, self.provides) )
 
                     if hasattr(env,"state_ask") and env.state_ask:
                         if not confirm("Do you want to continue with deploy?"):
                             abort("Deploy for host %s stopped" % (env.host,))
-                # warn_only isn't set so abort
+                # state_warn_only isn't set so abort
                 else:
-                    abort("Not all dependencies satisfied for task %s.%s \
-providing %s" % (fn.__module__,fn.__name__, self.provides) )
+                    abort("Not all dependencies satisfied for task %s.%s"
+                          "providing %s" % (fn.__module__,fn.__name__, self.provides) )
 
             # flag for updating status
             successfullyExecuted = 0
@@ -147,9 +154,7 @@ providing %s" % (fn.__module__,fn.__name__, self.provides) )
 
                 # update status if task successfully completed
                 if successfullyExecuted == 1:
-                    if isinstance(self.depends, basestring):
-                       env.state[env.host]+= [self.provides,]
-                    else:
-                       env.state[env.host]+= self.provides
+                    env.state[env.host]+= self.provides
 
+        wrapper.func_name = fn.func_name
         return wrapper
