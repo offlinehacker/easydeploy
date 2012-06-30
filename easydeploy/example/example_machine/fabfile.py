@@ -19,17 +19,16 @@ env.state_skip = True
 #env.state_ask = False
 
 basic={
-       "tasks": [
-                 {"easydeploy.tasks.ubuntu.core":
-                                [
-                                 "apt_update",
-                                 "apt_upgrade",
-                                 "create_admin_accounts",
-                                 "set_hostname",
-                                 "set_system_time"
-                                 ]
+       "tasks": {"easydeploy.tasks.ubuntu.core":
+                    [
+                      "apt_update",
+                      "apt_upgrade",
+                     ("apt_get",["vim", "nano"]),
+                      "create_admin_accounts",
+                      "set_hostname",
+                      "set_system_time"
+                     ]
                   }
-                 ]
        }
 
 @task
@@ -39,15 +38,14 @@ def deploy_basic():
         execute_tasks(env.tasks)
 
 server_basic={
-       "tasks": [
-                 {"easydeploy.tasks.ubuntu.core":
+       "tasks": {
+                 "easydeploy.tasks.ubuntu.core":
                                 [
                                  "install_unattended_upgrades",
                                  "harden_sshd",
                                  "disable_root_login"
                                  ]
-                  }
-                 ]
+                 }
        }
 
 @task
@@ -55,5 +53,5 @@ server_basic={
 def deploy_server_basic():
     execute(deploy_basic) 
     with settings(**server_basic):
-        pass
+        execute_tasks(env.tasks)
 

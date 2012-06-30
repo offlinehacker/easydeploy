@@ -2,7 +2,7 @@ import md5
 #import hashlib
 
 from Crypto.Cipher import ARC4
-from fabric.api import env
+from fabric.api import env, execute
 from fabric.contrib.files import upload_template
 from fabric.utils import abort
 from fabric.utils import warn
@@ -113,19 +113,19 @@ class state(object):
             # add empty list for saving installed stuff (happens first time only)
             if not env.state.has_key(env.host):
                 env.state[env.host]=[]
-            
-            # if function doesn't have provides, skip it
-            if self.provides == []:
-                warn("This task hasn't \"provides\"")
-                return
 
-            # Check if task should be skipped if it is already provided 
+            # Check if task should be skipped if it is already provided
             # with what state provides
             if hasattr(env,"state_skip") and env.state_skip:
                 if all(x in env.state[env.host] for x in self.provides):
                     puts("This task has already been executed, so we decide to skip it")
                     return
-            
+
+                # if function doesn't have provides, skip it
+                if self.provides == []:
+                    warn("This task doesn't provide anything")
+                    return
+
             # check that all dependences are installed
             if not all(x in env.state[env.host] for x in self.depends):
                 # if state_warn_only is set skip that package
@@ -167,4 +167,32 @@ class state(object):
 
 
 def execute_tasks(tasks):
-    pass
+    """
+    Executes tasks
+
+    :param tasks: List or dict of tasks
+    :type tasks: list or dict
+
+    :returns : None
+    :rtype: None
+    """
+
+    if isinstance(tasks, dict):
+        for task_namespace in tasks:
+            for task in task[task_namespace]:
+                if not isinstance(task,basestring) and len(task)>1:
+                    if isinstance(task[1],dict):
+                        execute(task_namespace+"."+task[0], task[1])
+                    else:
+                        execute(task_namespace+"."+task[0], task[1:])
+                else:
+                    execute(task_namespace+"."+task)
+    else:
+        for task in tasks:
+            if not isinstance(task,basestring) and len(task)>1:
+                if isinstance(task[1],dict):
+                    execute(task_namespace+"."+task[0], task[1])
+                else:
+                    execute(task_namespace+"."+task[0], task[1:])
+            else:
+                execute(task_namespace+"."+task)
