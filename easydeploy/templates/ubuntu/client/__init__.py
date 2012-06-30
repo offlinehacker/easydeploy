@@ -14,8 +14,8 @@ from cuisine import mode_sudo
 
 from easydeploy.core import err
 from easydeploy.core import upload_template_jinja2
-from easydeploy.fabfile.ubuntu.core import apt_get
-from easydeploy.fabfile.ubuntu.core import add_startup
+from easydeploy.templates.ubuntu.core import apt_get
+from easydeploy.templates.ubuntu.core import add_startup
 
 import os
 
