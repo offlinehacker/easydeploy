@@ -1,5 +1,4 @@
 import md5
-import sys
 
 from Crypto.Cipher import ARC4
 from fabric.api import env
