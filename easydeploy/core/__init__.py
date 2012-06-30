@@ -99,42 +99,57 @@ class state(object):
     """
 
     def __init__(self, provides=None, depends=None):
-        self.depends = depends
-        self.provides = provides
+        self.depends = depends if depends != None else []
+        self.provides = provides if provides != None else []
 
     def __call__(self, fn):
+
         def wrapper(*args):
+            continoueFlag = 1
+            # add state dictionary (happens first time only)
             if not hasattr(env,"state"):
                 env.state={}
-            if not env.state[env.host]:
+            # add empty list for saving installed stuff (happens first time only)
+            if not env.state.has_key(env.host):
                 env.state[env.host]=[]
-
-            if not all(x in env.state for x in self.depends):
+            
+            # check that all dependences are installed
+            if not all(x in env.state[env.host] for x in self.depends):
+                # if state_warn_only is set skip that package
                 if hasattr(env,"state_warn_only") and env.state_warn_only:
+                    continoueFlag = 0
                     warn("Not all dependencies satisfied for task %s.%s \
-                    providing %s" % (fn.__module__,fn.__name__, self.provides) )
+providing %s" % (fn.__module__,fn.__name__, self.provides) )
 
                     if hasattr(env,"state_ask") and env.state_ask:
                         if not confirm("Do you want to continue with deploy?"):
                             abort("Deploy for host %s stopped" % (env.host,))
-
+                # warn_only isn't set so abort
                 else:
-                    error("Not all dependencies satisfied for task %s.%s \
-                    providing %s" % (fn.__module__,fn.__name__, self.provides) )
+                    abort("Not all dependencies satisfied for task %s.%s \
+providing %s" % (fn.__module__,fn.__name__, self.provides) )
 
-            try:
-                fn(*args)
-            except:
-                if hasattr(env,"state_warn_only") and env.state_warn_only:
-                    warn("Problems running task %s.%s"
-                         % (fn.__module__, fn.__name_))
+            # flag for updating status
+            successfullyExecuted = 0
+            # if dependences satisfied execute the task
+            if continoueFlag:
+                try:
+                    # execute decorated function
+                    fn(*args)
+                    # last operation confirm successfully completed task
+                    successfullyExecuted = 1
+                except:
+                    if hasattr(env,"state_warn_only") and env.state_warn_only:
+                        warn("Problems running task %s.%s"
+                             % (fn.__module__, fn.__name__))
+                    else:
+                        raise
 
-                else:
-                    raise
-
-            if isinstance(self.depends, basestring):
-               env.state[env.host]+= [self.provides,]
-            else:
-               env.state[env.host]+= self.provides
+                # update status if task successfully completed
+                if successfullyExecuted == 1:
+                    if isinstance(self.depends, basestring):
+                       env.state[env.host]+= [self.provides,]
+                    else:
+                       env.state[env.host]+= self.provides
 
         return wrapper
