@@ -179,20 +179,20 @@ def execute_tasks(tasks):
 
     if isinstance(tasks, dict):
         for task_namespace in tasks:
-            for task in task[task_namespace]:
+            for task in tasks[task_namespace]:
                 if not isinstance(task,basestring) and len(task)>1:
-                    if isinstance(task[1],dict):
-                        execute(task_namespace+"."+task[0], task[1])
+                    if isinstance(task[1],dict) and len(task)==2:
+                        execute(task_namespace+"."+task[0], **task[1])
                     else:
-                        execute(task_namespace+"."+task[0], task[1:])
+                        execute(task_namespace+"."+task[0], *task[1:])
                 else:
                     execute(task_namespace+"."+task)
     else:
         for task in tasks:
             if not isinstance(task,basestring) and len(task)>1:
-                if isinstance(task[1],dict):
-                    execute(task_namespace+"."+task[0], task[1])
+                if isinstance(task[1],dict) and len(task)==2:
+                    execute(task[0], **task[1])
                 else:
-                    execute(task_namespace+"."+task[0], task[1:])
+                    execute(task[0], *task[1:])
             else:
-                execute(task_namespace+"."+task)
+                execute(task)
