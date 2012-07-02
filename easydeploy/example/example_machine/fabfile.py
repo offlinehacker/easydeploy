@@ -7,8 +7,7 @@ from fabric.api import execute
 
 from easydeploy.core import state, execute_tasks
 
-if hasattr(env,"show_all") and env.show_all:
-    import easydeploy.tasks
+import easydeploy.tasks
 
 env.hosts = ["127.0.0.1"]
 
@@ -21,9 +20,9 @@ env.state_skip = True
 basic={
        "tasks": {"easydeploy.tasks.ubuntu.core":
                     [
-                      "apt_update",
+                     {"name":"apt_update","settings":{"warn_only":True}},
                       "apt_upgrade",
-                     ("apt_get",["vim", "nano"]),
+                     ("apt_get", ["vim", "nano"]),
                       "create_admin_accounts",
                       "set_hostname",
                       "set_system_time"
@@ -49,9 +48,8 @@ server_basic={
        }
 
 @task
-@state(requiers="deploy.basic",provides="deploy.server_basic")
+@state(depends="deploy.basic",provides="deploy.server_basic")
 def deploy_server_basic():
     execute(deploy_basic) 
     with settings(**server_basic):
         execute_tasks(env.tasks)
-

@@ -10,6 +10,7 @@ class TestTaksExecution(unittest.TestCase):
         self.task2executed= False
         self.task1_2executed= False
         self.task_with_params_executed= False
+        self.task_with_settings_executed= False
         
         @task
         def task1():
@@ -35,9 +36,29 @@ class TestTaksExecution(unittest.TestCase):
             self.assertEqual(param1,"param1")   
             self.assertEqual(param2,"param2")
             
-        #Dirty hack to emulate fab
+        @task    
+        def task_with_settings1():
+            self.task_with_settings_executed= True
+            
+        @task    
+        def task_with_settings2(param1,param2):
+            self.task_with_settings_executed= True
+            self.assertEqual(param1,"param1")   
+            self.assertEqual(param2,"param2")
+            
+        @task    
+        def task_with_settings3(param1,param2):
+            self.task_with_settings_executed= True
+            self.assertEqual(param1,"param1")   
+            self.assertEqual(param2,"param2")
+            self.assertIn("my_setting", env)
+            
+        #Dirty hack to emulate known fab tasks
         state.commands.update({"task1":task1, "task1_2":task1_2, 
-                               "task2":task2, "task_with_params": task_with_params})
+                               "task2":task2, "task_with_params": task_with_params,
+                               "task_with_settings1": task_with_settings1,
+                               "task_with_settings2": task_with_settings2,
+                               "task_with_settings3": task_with_settings3})
         
         first={
                "first":"first_var",
@@ -60,19 +81,33 @@ class TestTaksExecution(unittest.TestCase):
                         ("task_with_params",{"param1":"param1", "param2":"param2"})
                         ]
                }
+        
+        _settings={
+                  "tasks":[
+                              {"name": "task_with_settings1"},
+                              {"name": "task_with_settings2",
+                               "params": ["param1","param2"]},
+                              {"name": "task_with_settings3",
+                               "params": ["param1","param2"],
+                               "settings": {"my_setting": True}},
+                              ]
+                  }
             
         @task
         def main_task():
             with settings(**first):
-                    execute_tasks(env.tasks)
-                    self.assertTrue(self.task1executed)  
-                    self.assertTrue(self.task1_2executed) 
+                execute_tasks(env.tasks)
+                self.assertTrue(self.task1executed)  
+                self.assertTrue(self.task1_2executed) 
             with settings(**second):
-                    execute_tasks(env.tasks)
-                    self.assertTrue(self.task2executed)
+                execute_tasks(env.tasks)
+                self.assertTrue(self.task2executed)
             with settings(**params):
-                    execute_tasks(env.tasks)
-                    self.assertTrue(self.task_with_params_executed)
+                execute_tasks(env.tasks)
+                self.assertTrue(self.task_with_params_executed)
+            with settings(**_settings):
+                execute_tasks(env.tasks)
+                self.assertTrue(self.task_with_settings_executed)
                     
         execute(main_task)
         state.commands={}

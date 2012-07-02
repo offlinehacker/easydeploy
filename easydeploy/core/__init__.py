@@ -2,7 +2,7 @@ import md5
 #import hashlib
 
 from Crypto.Cipher import ARC4
-from fabric.api import env, execute
+from fabric.api import env, execute, settings
 from fabric.contrib.files import upload_template
 from fabric.utils import abort
 from fabric.utils import warn
@@ -26,15 +26,14 @@ def upload_template_jinja2(template, destination, use_sudo=True):
     """
     Uploads template using jinja2
 
-    :param template:
-    :type template: a
-    :param destination: a
-    :type destination: a
-    :param use_sudo: a
-    :type use_sudo: a
+    :param template: Local path to template
+    :type template: str
+    :param destination: Remote destination path
+    :type destination: str
+    :param use_sudo: Should we use sudo
+    :type use_sudo: bool
 
-    :returns : a
-    :rtype: a
+    :returns : Whatever upload_template returns
     """
 
     return upload_template(template, destination, context=env, use_sudo=use_sudo, use_jinja=True)
@@ -89,7 +88,7 @@ class state(object):
     failed state.
     * ``env.state`` list tells which states for which hosts are already provided,
     * if ``env.state_skip`` is set tasks gets skipped when provided states are
-    in env.state list.
+    in env.state list::
 
         @state(provides=['nginx.nginx','nginx.config'],depends=['apt.update'])
         def nginx():
@@ -168,10 +167,40 @@ class state(object):
 
 def execute_tasks(tasks):
     """
-    Executes tasks
+    Executes tasks,
+    provided as list of tasks with arguments and parameters::
+
+        [
+          "task1",
+         ("task2", "val1", "val2"),
+         ("task3", {"kwparam1":"val1", "kwparam2":"val2"}),
+         {"task": "task4",
+          "params":["val1","val2"],
+          "settings":{"warn_only":True}},
+         {"task": "task5",
+          "params":{"kwparam1":"val1", "kwparam2":"val2"},
+          "settings":{"warn_only":True}}
+         ]
+
+    or as dictionary of namespaces and its list of tasks with
+    arguments and parameters::
+
+        {"namespace":
+            [
+              "task1",
+             ("task2", "val1", "val2"),
+             ("task3", {"kwparam1":"val1", "kwparam2":"val2"}),
+             {"task": "task4",
+              "params":["val1","val2"],
+              "settings":{"warn_only":True}},
+             {"task": "task5",
+              "params":{"kwparam1":"val1", "kwparam2":"val2"},
+              "settings":{"warn_only":True}}
+             ]
+          }
 
     :param tasks: List or dict of tasks
-    :type tasks: list or dict
+    :type tasks: list, dict
 
     :returns : None
     :rtype: None
@@ -180,19 +209,33 @@ def execute_tasks(tasks):
     if isinstance(tasks, dict):
         for task_namespace in tasks:
             for task in tasks[task_namespace]:
-                if not isinstance(task,basestring) and len(task)>1:
-                    if isinstance(task[1],dict) and len(task)==2:
-                        execute(task_namespace+"."+task[0], **task[1])
-                    else:
-                        execute(task_namespace+"."+task[0], *task[1:])
-                else:
-                    execute(task_namespace+"."+task)
+                _execute_task(task,task_namespace)
     else:
         for task in tasks:
-            if not isinstance(task,basestring) and len(task)>1:
-                if isinstance(task[1],dict) and len(task)==2:
-                    execute(task[0], **task[1])
-                else:
-                    execute(task[0], *task[1:])
+            _execute_task(task)
+
+def _execute_task(task, namespace=""):
+    if namespace:
+        namespace=namespace.rstrip(".")+"."
+    if not isinstance(task,basestring):
+        _name=""
+        _params= {}
+        _settings= {}
+        if isinstance(task,dict):
+            _name= task.get("name")
+            _params=  task.get("params") or {}
+            _settings= task.get("settings") or {}
+        elif isinstance(task[1],dict) and len(task)==2:
+            _name= task[0]
+            _params= task[1]
+        else:
+            _name= task[0]
+            _params= task[1:]
+
+        with settings(**_settings):
+            if isinstance(_params,dict):
+                execute(namespace+_name, **_params)
             else:
-                execute(task)
+                execute(namespace+_name, *_params)
+    else:
+        execute(namespace+task)

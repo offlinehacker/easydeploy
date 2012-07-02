@@ -1,6 +1,4 @@
-from fabric.api import env
-from fabric.api import sudo
-from fabric.api import task
+from fabric.api import task, settings, sudo, env, run
 from fabric.contrib.console import confirm
 from fabric.contrib.files import append
 from fabric.contrib.files import exists
@@ -25,10 +23,17 @@ def apt_get(pkg_name, repo=None):
     if repo:
         sudo("apt-get update")
 
-    if isinstance(opts["pkg_name"], (tuple, list, dict, set)):
-        sudo("apt-get -yq install", opts["pkg_name"].join(" "))
-    else:
+    if isinstance(opts["pkg_name"], basestring):
         sudo("apt-get -yq install %(pkg_name)s" % opts)
+    else:
+        sudo("apt-get -yq install", " ".join(opts["pkg_name"]))
+        
+@task
+def apt_update(): 
+    sudo("apt-get -y update")
+    
+@task
+def apt_upgrade(): sudo("apt-get -y upgrade")
 
 @task
 def add_startup(service=None):
