@@ -17,7 +17,7 @@ def err(msg):
     :param msg: Error messasage
     :type msg: str
 
-    :returns : None
+    :returns: None
     :rtype: None
     """
     raise AttributeError(msg)
@@ -33,7 +33,7 @@ def upload_template_jinja2(template, destination, use_sudo=True):
     :param use_sudo: Should we use sudo
     :type use_sudo: bool
 
-    :returns : Whatever upload_template returns
+    :returns: Whatever upload_template returns
     """
 
     return upload_template(template, destination, context=env, use_sudo=use_sudo, use_jinja=True)
@@ -42,13 +42,13 @@ def encpass(key, keypass=None):
     """
     Encripts password using key
 
-    :param key: a
-    :type key: a
-    :param keypass: a
-    :type keypass: a
+    :param key: Key to enrypt with
+    :type key: str
+    :param keypass: Password to encrypt
+    :type keypass: str
 
-    :returns : a
-    :rtype: a
+    :returns: Encrypted password
+    :rtype: str
     """
     opts = dict (
             keypass=keypass or env.get("keypass") or err("env.keypass is not set")
@@ -67,7 +67,7 @@ def decpass(key, keypass=None):
     :param keypass: Password using to decript
     :type keypass: str
 
-    :returns : Plaintext
+    :returns: Plaintext
     :rtype: str
     """
 
@@ -82,17 +82,36 @@ def decpass(key, keypass=None):
 class state(object):
     """
     Decorator for handling states and its errors.
+    
+    .. note::
+    
+        Its main task is to provide a system for checking for provided dependencies
+        among different tasks. So if some task fails, execution can continue and
+        tasks that depends on whatever failed task provides won't run.
+    
+    .. warning::
+    
+        This decorator will not install task dependencies instead of you, its main
+        task is to track which tasks has completed and which not.
+    
+    ``env.state`` list tells which states for which hosts are already provided.
+    It is a simple dictionary of ``{"host_name": {"provided1", "provided2",...}}``
 
     * Set ``env.state_warn_only`` to only warn about failed state.
-    * Set ``env.state_ask`` if you want to be asked if you want to continue on
-    failed state.
-    * ``env.state`` list tells which states for which hosts are already provided,
-    * if ``env.state_skip`` is set tasks gets skipped when provided states are
-    in env.state list::
+    * Set ``env.state_ask`` if you want to be asked if you want to continue on failed state.
+    * if ``env.state_skip`` is set tasks gets skipped when provided states are in env.state list
+    
+    Example::
+    
+        @task
+        @state(provides="apt.update")
+        def apt_update():
+            sudo("apt-get -y update")
 
+        @task
         @state(provides=['nginx.nginx','nginx.config'],depends=['apt.update'])
         def nginx():
-            apt-get("install nging")
+            apt-get("install nginx")
 
         ...
 
@@ -162,8 +181,36 @@ class state(object):
                     env.state[env.host]+= self.provides
 
         wrapper.func_name = fn.func_name
+        if hasattr(fn, '__name__'):
+            wrapper.__name__ = self.name = fn.__name__
+        if hasattr(fn, '__doc__'):
+            wrapper.__doc__ = fn.__doc__
+        if hasattr(fn, '__module__'):
+            wrapper.__module__ = fn.__module__
+            
         return wrapper
-
+    
+def get_envvar(varname, section=None, envdefault=None):
+    """
+    Function for smarter retrival of variables from ``env``, with section support
+    and defaults
+    
+    .. note::
+        First it searches for variable ``varname`` in ``env[section]`` in 
+        case section is specified, if not found it searches for ``varname`` in 
+        ``env``, if not found and ``envdefault`` specified it tries to search 
+        ``envdefault`` in ``env``. 
+        
+        ``env.section`` overrides section specified to this function
+    """
+    
+    return (env.get("section") \
+                and isinstance(env.get(env.get("section")),dict) \
+                and env.get(env.get("section"))[varname]) or \
+            (section \
+                and isinstance(env.get(section),dict) \
+                and env.get(section)[varname]) or \
+            env.get(envdefault) or env.get(varname)
 
 def execute_tasks(tasks):
     """
@@ -202,7 +249,7 @@ def execute_tasks(tasks):
     :param tasks: List or dict of tasks
     :type tasks: list, dict
 
-    :returns : None
+    :returns: None
     :rtype: None
     """
 

@@ -6,15 +6,24 @@ from fabric.contrib.files import sed
 from fabric.contrib.files import uncomment
 from fabric.operations import prompt
 
-from easydeploy.core import err
-from easydeploy.core import upload_template_jinja2
+from easydeploy.core import err, state
+from easydeploy.core import upload_template_jinja2, get_envvar
 
 @task
+@state(depends="apt_update")
 def apt_get(pkg_name, repo=None):
-    """Install package"""
+    """
+    Install package
+
+    :param pkg_name: Name or list of packages
+    :type pkg_name: list, str
+    :param repo: Optional repository to use
+    :type repo: str
+    """
+
     opts = dict(
-        pkg_name = pkg_name or env.get("pkg_name") or err("env.pkg_name must be set"),
-        repo = repo or env.get("repo") or None
+        pkg_name = pkg_name or err("Pkg_name must be set"),
+        repo = repo
     )
 
     if opts["repo"]:
@@ -27,19 +36,28 @@ def apt_get(pkg_name, repo=None):
         sudo("apt-get -yq install %(pkg_name)s" % opts)
     else:
         sudo("apt-get -yq install", " ".join(opts["pkg_name"]))
-        
+
 @task
-def apt_update(): 
+@state(provides="apt_update")
+def apt_update():
+    "Updates apt"
     sudo("apt-get -y update")
-    
+
 @task
-def apt_upgrade(): sudo("apt-get -y upgrade")
+def apt_upgrade():
+    "Upgrades apt"
+    sudo("apt-get -y upgrade")
 
 @task
 def add_startup(service=None):
-    """Adds service to startup"""
+    """
+    Adds service to startup
+
+    :param service: Name of the service in /etc/init.d/
+    :type service: str
+    """
     opts = dict(
-        service=service or env.get("service") or err("env.service must be set")
+        service=service or err("Service must be set")
         )
 
     if isinstance(opts["sevice"], (tuple, list, dict, set)):
@@ -49,52 +67,90 @@ def add_startup(service=None):
         sudo("update-rc.d %(service)s defaults" % opts)
 
 @task
-def create_admin_accounts(admins=None, default_password=None):
-    """Create admin accounts, so admins can access the server."""
+def create_accounts(users=None, default_password=None, 
+                    groups=None, admin=False):
+    """
+    Create accounts with same settings
+    
+    default section: accounts
+
+    :param users: List of users
+    :type users: str, list
+    :param default_password: Their default password
+    :type default_password: str
+    :param groups: List or string of comma separated groups
+    :type groups: list, str
+    :param admin: Should be users admins or not
+    :type admin: bool
+    """
+
     opts = dict(
-        admins=admins or env.get('admins') or err("env.admins must be set"),
-        default_password=default_password or env.get('default_password') or 'secret',
+        users=users 
+                or get_envvar('usernames',section='accounts') 
+                or err("Users must be set"),
+        default_password=default_password 
+                or get_envvar('default_password',section='accounts')
+                or err("Default_password must be set"),
+        groups=groups
+                or get_envvar('groups',section='accounts'),
+        admin=admin or get_envvar('admin',section='accounts')
     )
 
-    for admin in opts["admins"]:
-        create_admin_account(admin, default_password=default_password)
-
-    if not env.get('confirm'):
-        confirm("Users %(admins)s were successfully created. Notify"
-                "them that they must login and change their default password "
-                "(%(default_password)s) with the ``passwd`` command. Proceed?" % opts)
+    for username in opts["users"]:
+        create_account(username, default_password=opts["default_password"], admin=opts["admin"])
 
 @task
-def create_admin_account(admin, default_password=None):
-    """Create an account for an admin to use to access the server."""
+def create_account(username, default_password=None, groups=[],
+                admin=False, priv= None, pub=None):
+    """
+    Creates account
+
+    .. note::
+         Variables for this function cannot be set using env
+
+    :param username: Username
+    :type username: str
+    :param default_password: Default password or secret
+    :type default_password: str
+    :param groups: List or string of comma separated groups
+    :type groups: list or str
+    :param priv: private key
+    :type priv: str
+    :param pub: public key
+    :type pub: str
+    """
+
     opts = dict(
+        username=username,
+        default_password=default_password,
         admin=admin,
-        default_password=default_password or env.get('default_password') or 'secret',
+        groups= (",".join(groups)) if not isinstance(groups,basestring) else groups,
+        priv=priv,
+        pub=pub
     )
 
     # create user
-    sudo('egrep %(admin)s /etc/passwd || adduser %(admin)s --disabled-password --gecos ""' % opts)
+    sudo('egrep %(username)s /etc/passwd || adduser %(username)s --disabled-password --gecos ""' % opts)
+
+    if opts["groups"]:
+        sudo('usermod -a -G  %(groups)s %(username)' % opts)
 
     # add public key for SSH access
-    if not exists('/home/%(admin)s/.ssh' % opts):
-        sudo('mkdir /home/%(admin)s/.ssh' % opts)
+    if not exists('/home/%(username)s/.ssh' % opts):
+        sudo('mkdir /home/%(username)s/.ssh' % opts)
 
-    opts['pub'] = prompt("Paste %(admin)s's public key or leave alone: " % opts)
     if opts['pub']:
-        sudo("echo '%(pub)s' > /home/%(admin)s/.ssh/authorized_keys" % opts)
+        sudo("echo '%(pub)s' > /home/%(username)s/.ssh/authorized_keys" % opts)
 
-    opts['priv'] = prompt("Paste %(admin)s's private key or leave alone: " % opts)
     if opts['priv']:
-        sudo("echo '%(priv)s' > /home/%(admin)s/.ssh/id_rsa" % opts)
+        sudo("echo '%(priv)s' > /home/%(username)s/.ssh/id_rsa" % opts)
 
-    # allow this user in sshd_config
-    append("/etc/ssh/sshd_config", 'AllowUsers %(admin)s@*' % opts, use_sudo=True)
-
-    # allow sudo for maintenance user by adding it to 'sudo' group
-    sudo('usermod -a -G sudo %(admin)s' % opts)
+    if opts['admin']:
+        # allow sudo for maintenance user by adding it to 'sudo' group
+        sudo('usermod -a -G sudo %(username)s' % opts)
 
     # set default password for initial login
-    sudo('echo "%(admin)s:%(default_password)s" | chpasswd' % opts)
+    sudo('echo "%(username)s:%(default_password)s" | chpasswd' % opts)
 
 @task
 def harden_sshd():
@@ -119,7 +175,13 @@ def install_ufw(rules=None):
 
 @task
 def configure_ufw(rules=None):
-    """Configure Uncomplicated Firewall."""
+    """
+    Configure Uncomplicated Firewall.
+
+    :param rules: list of firewall rules
+    :type rules: list, str
+    """
+
     # reset rules so we start from scratch
     sudo('ufw --force reset')
 
@@ -140,7 +202,15 @@ def disable_root_login():
 
 @task
 def set_hostname(server_ip=None, hostname=None):
-    """Set server's hostname."""
+    """
+    Set server's hostname
+
+    :param server_ip: ip
+    :type server_ip: str
+    :param hostname: hostname
+    :type hostname: str
+    """
+
     opts = dict(
         server_ip=server_ip or env.server_ip or err("env.server_ip must be set"),
         hostname=hostname or env.hostname or err("env.hostname must be set"),
@@ -152,7 +222,12 @@ def set_hostname(server_ip=None, hostname=None):
 
 @task
 def set_system_time(timezone=None):
-    """Set timezone and install ``ntp`` to keep time accurate."""
+    """
+    Sets system timezone and installs ntp
+
+    :param timezone: Timezone, for example ``/usr/share/zoneinfo/UTC``
+    :type timezone: str
+    """
 
     opts = dict(
         timezone=timezone or env.get('timezone') or '/usr/share/zoneinfo/UTC',
@@ -165,40 +240,14 @@ def set_system_time(timezone=None):
     apt_get('ntp')
 
 @task
-def install_system_libs(additional_libs=None):
-    """Install a bunch of stuff we need for normal operation such as
-    ``gcc``, ``rsync``, ``vim``, ``libpng``, etc."""
-
-    opts = dict(
-        additional_libs=additional_libs or env.get('additional_libs') or '',
-    )
-
-    sudo('apt-get -yq install '
-
-             # tools
-             'lynx '
-             'curl '
-             'rsync '
-             'telnet '
-             'build-essential '
-             'python-software-properties '  # to get add-apt-repositories command
-
-             # imaging, fonts, compression, encryption, etc.
-             'libjpeg-dev '
-             'libjpeg62-dev '
-             'libfreetype6-dev '
-             'zlib1g-dev '
-             'libreadline5-dev '
-             'zlib1g-dev '
-             'libbz2-dev '
-             'libssl-dev '
-             'libjpeg62-dev '
-             '%(additional_libs)s' % opts
-             )
-
-@task
 def install_unattended_upgrades(email=None):
-    """Configure Ubuntu to automatically install security updates."""
+    """
+    Configure Ubuntu to automatically install security updates.
+
+    :param email: email where you want to receive info about updates
+    :type email: str
+    """
+
     opts = dict(
         email=email or env.get('email') or err('env.email must be set'),
     )
@@ -225,6 +274,13 @@ def install_unattended_upgrades(email=None):
 
 @task
 def install_network_config(path=None):
+    """
+    Installs network configuration, using jinja2 template.
+
+    :param path: Path to your template folder
+    :type path: str
+    """
+
     opts = dict(
             path=path or env.get("path") or err('env.path must be set')
             )

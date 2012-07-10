@@ -14,6 +14,7 @@ from cuisine import mode_sudo
 
 from easydeploy.core import err
 from easydeploy.core import upload_template_jinja2
+from easydeploy.core import get_envvar
 from easydeploy.tasks.ubuntu.core import apt_get
 from easydeploy.tasks.ubuntu.core import add_startup
 
@@ -21,10 +22,19 @@ import os
 
 @task
 def raid_monitoring(email=None):
-    """Configure monitoring of our RAID-1 field. If anything goes wrong,
-    send an email!"""
+    """
+    Configure monitoring of our RAID-1 field. If anything goes wrong,
+    send an email!
+    
+    default env section: raid
+    
+    :param email: Email to send reports
+    :type email: str
+    """
     opts = dict(
-        email=email or env.get('email') or err('env.email must be set'),
+        email=email 
+                or get_envvar('email',section='raid')  
+                or err('Email must be set'),
     )
 
     # enable email notifications from mdadm raid monitor
@@ -35,29 +45,20 @@ def raid_monitoring(email=None):
     uncomment('/etc/default/smartmontools', '#start_smartd=yes', use_sudo=True)
 
 @task
-def install_nginx(nginx_conf=None):
-    """Install and configure Nginx webserver."""
-    apt_get("ngingx", "ppa:nginx/stable")
-    add_startup("nginx")
-
-@task
-def configure_nginx(path=None):
-    """Upload Nginx configuration and restart Nginx so this configuration takes
-    effect."""
-    opts = dict(
-        path=path or env.get('path') or err("env.path must be set"),
-    )
-
-    upload_template_jinja2("%(path)s/etc/nignx/nginx.conf" % opts, 
-            '/etc/nginx/nginx.conf', use_sudo=True)
-    sudo('service nginx restart')
-
-@task
 def install_sendmail(email=None):
-    """Prepare a localhost SMTP server for sending out system notifications
-    to admins."""
+    """
+    Prepare a localhost SMTP server for sending out system notifications
+    to admins
+    
+    default env section: sendmail
+    
+    :param email: Email to send reports
+    :type email: str
+    """
     opts = dict(
-        email=email or env.get('email') or err('env.email must be set'),
+        email=email 
+                or get_envvar('email',section='sendmail') 
+                or err('Email must be set'),
     )
 
     # install sendmail
@@ -75,20 +76,34 @@ def install_dnsmasq():
 
 @task
 def configure_dnsmasq(path=None):
-    """Configures local dns server"""
+    """
+    Configures local dns server
+    
+    :param path: Template folder
+    :type path: str
+    """
     opts = dict(
         path=path or env.get('path') or err("env.path must be set"),
     )
 
-    upload_template_jinja2("%(path)s/etc/dnsmasq.con" % opts, 
+    upload_template_jinja2("%(path)s/etc/dnsmasq.con" % opts,
             '/etc/dnsmasq.conf', use_sudo=True)
     sudo('service nginx restart')
 
 @task
 def install_rkhunter(email=None):
-    """Install and configure RootKit Hunter."""
+    """
+    Install and configure RootKit Hunter
+    
+    default env section: rkhunter
+    
+    :param email: Email to send reports
+    :type email: str
+    """
     opts = dict(
-        email=email or env.get('email') or err('env.email must be set'),
+        email=email 
+                or get_envvar('email',section='rkhunter') 
+                or err('Email must be set'),
     )
 
     # install RKHunter
@@ -104,74 +119,36 @@ def install_rkhunter(email=None):
     uncomment('/etc/rkhunter.conf', '#ALLOWHIDDENDIR=\/dev\/.initramfs', use_sudo=True)
 
 @task
-def generate_selfsigned_ssl(hostname=None):
-    """Generate self-signed SSL certificates and provide them to Nginx."""
-    opts = dict(
-        hostname=hostname or env.get('hostname') or 'STAR.niteoweb.com',
-    )
-
-    if not exists('mkdir /etc/nginx/certs'):
-        sudo('mkdir /etc/nginx/certs')
-
-    sudo('openssl genrsa -des3 -out server.key 2048')
-    sudo('openssl req -new -key server.key -out server.csr')
-    sudo('cp server.key server.key.password')
-    sudo('openssl rsa -in server.key.password -out server.key')
-    sudo('openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt')
-    sudo('cp server.crt /etc/nginx/certs/%(hostname)s.crt' % opts)
-    sudo('cp server.key /etc/nginx/certs/%(hostname)s.key' % opts)
-
-@task
-def install_php():
-    """Install FastCGI interface for running PHP scripts via Nginx."""
-
-    # install php-fpm, php process manager
-    apt_get(['php5-fpm', 'php5-curl', 'php5-mysql', 'php5-gd'], 'ppa:brianmercer/php')
-
-    # the command above also pulls in apache, which we cannot remove -> make id not start at bootup
-    sudo('update-rc.d -f apache2 remove')
-
-    # security harden PHP5
-    sed('/etc/php5/cgi/php.ini', ';cgi\.fix_pathinfo=1', 'cgi\.fix_pathinfo=0', use_sudo=True)
-    sed('/etc/php5/cgi/php.ini', '; allow_call_time_pass_reference', 'allow_call_time_pass_reference = Off', use_sudo=True)
-    sed('/etc/php5/cgi/php.ini', '; display_errors', 'display_errors = Off', use_sudo=True)
-    sed('/etc/php5/cgi/php.ini', '; html_errors', 'html_errors = Off', use_sudo=True)
-    sed('/etc/php5/cgi/php.ini', '; magic_quotes_gpc', 'magic_quotes_gpc = Off', use_sudo=True)
-    sed('/etc/php5/cgi/php.ini', '; log_errors', 'log_errors = On', use_sudo=True)
-
-    # restart for changes to apply
-    sudo('/etc/init.d/php5-fpm restart')
-
-@task
-def install_mysql(default_password=None):
+def install_mysql(password=None):
     """Install MySQL database server."""
     opts = dict(
-        default_password=default_password or env.get('default_password') or 'secret'
+        password=password 
+                or get_envvar('password',section='mysql','default_password') 
+                or err("No password for mysql set")
     )
 
     # first set root password in advance so we don't get the package
     # configuration dialog
-    sudo('echo "mysql-server-5.0 mysql-server/root_password password %(default_password)s" | debconf-set-selections' % opts)
-    sudo('echo "mysql-server-5.0 mysql-server/root_password_again password %(default_password)s" | debconf-set-selections' % opts)
+    sudo('echo "mysql-server-5.0 mysql-server/root_password password %(password)s" | debconf-set-selections' % opts)
+    sudo('echo "mysql-server-5.0 mysql-server/root_password_again password %(password)s" | debconf-set-selections' % opts)
 
     # install MySQL along with php drivers for it
     apt_get('mysql-server mysql-client')
-
-    if not env.get('confirm'):
-        confirm("You will now start with interactive MySQL secure installation."
-                " Current root password is '%(default_password)s'. Change it "
-                "and save the new one to your password managere. Then answer "
-                "with default answers to all other questions. Ready?" % opts)
-    sudo('/usr/bin/mysql_secure_installation')
-
-    # restart mysql and php-fastcgi
-    sudo('service mysql restart')
-    sudo('/etc/init.d/php-fastcgi restart')
-
+ 
+@task   
+def configure_mysql_backups(password=None, time=None):
+    """Example task for mysql backups"""
+    opts = dict(
+        password=password 
+                or get_envvar('password',section='mysql','default_password')
+                or err("No password for mysql set"),
+        time=time 
+                or get_envvar('time',section='mysql') 
+                or err("No backup time for mysql set")
+    )
     # configure daily dumps of all databases
     sudo('mkdir /var/backups/mysql')
-    password = prompt('Please enter your mysql root password so I can configure daily backups:')
-    sudo("echo '0 7 * * * mysqldump -u root -p%s --all-databases | gzip > /var/backups/mysql/mysqldump_$(date +%%Y-%%m-%%d).sql.gz' > /etc/cron.d/mysqldump" % password)
+    sudo("echo %(time)s mysqldump -u root -p%(password)s --all-databases | gzip > /var/backups/mysql/mysqldump_$(date +%%Y-%%m-%%d).sql.gz' > /etc/cron.d/mysqldump" % opts)
 
 @task
 def install_munin_node(add_to_master=True):
@@ -200,8 +177,6 @@ def install_munin_node(add_to_master=True):
 def install_postgres():
     """Install and configure Postgresql database server."""
     sudo('apt-get -yq install postgresql libpq-dev')
-    configure_postgres()
-    initialize_postgres()
 
 @task
 def configure_postgres():
@@ -261,7 +236,7 @@ def install_avahi():
 @task
 def configure_avahi(path=None):
     """Configure avahi for mdns support"""
-    opts = dict( 
+    opts = dict(
         path = path or env.get("path") or err("env.path must be set")
     )
 
@@ -277,31 +252,6 @@ def configure_avahi(path=None):
                     "/etc/nsswitch.conf")
 
     sudo("service avahi-daemon restart")
-
-@task
-def configure_hetzner_backup(duplicityfilelist=None, duplicitysh=None):
-    """Hetzner gives us 100GB of backup storage. Let's use it with
-    Duplicity to backup the whole disk."""
-    opts = dict(
-        duplicityfilelist=duplicityfilelist or env.get('duplicityfilelist') or '%s/etc/duplicityfilelist.conf' % os.getcwd(),
-        duplicitysh=duplicitysh or env.get('duplicitysh') or '%s/etc/duplicity.sh' % os.getcwd(),
-    )
-
-    # install duplicity and dependencies
-    apt_get('duplicity ncftp')
-
-    # what to exclude
-    upload_template_jinja2(opts['duplicityfilelist'], '/etc/duplicityfilelist.conf', use_sudo=True)
-
-    # script for running Duplicity
-    upload_template_jinja2(opts['duplicitysh'], '/usr/sbin/duplicity.sh', use_sudo=True)
-    sudo('chmod +x /usr/sbin/duplicity.sh')
-
-    # cronjob
-    sudo("echo '0 8 * * * root /usr/sbin/duplicity.sh' > /etc/cron.d/duplicity ")
-
-    if not env.get('confirm'):
-        confirm("You need to manually run a full backup first time. Noted?")
 
 @task
 def install_aiccu():
