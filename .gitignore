@@ -14,3 +14,6 @@ easydeploy/fabfile/.ropeproject/*
 
 #vim
 tags
+
+build/*
+dist/*

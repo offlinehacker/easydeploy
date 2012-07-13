@@ -1,4 +1,5 @@
 import md5
+#import hashlib
 
 from Crypto.Cipher import ARC4
 from fabric.api import env
@@ -55,7 +56,7 @@ def encpass(key, keypass=None):
             )
 
     RC4= ARC4.new(opts["keypass"])
-    RC4.encrypt(md5.new(opts["keypass"]).digest())
+    RC4.encrypt(md5.new(opts["keypass"]).digest()) #hashlib.md5 instead md5.new
     RC4.encrypt(key)
 
 def decpass(key, keypass=None):
@@ -113,6 +114,11 @@ class state(object):
             if not env.state.has_key(env.host):
                 env.state[env.host]=[]
             
+            # if function doesn't have provides, skip it
+            if self.provides == []:
+                warn("This task hasn't \"provides\"")
+                return
+
             # Check if task should be skipped if it is already provided 
             # with what state provides
             if hasattr(env,"state_skip") and env.state_skip:
