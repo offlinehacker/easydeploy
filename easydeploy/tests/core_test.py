@@ -39,13 +39,13 @@ class TestStateDecorator(unittest.TestCase):
         env.warn_only = False
         env.state_warn_only = True
         env.state_ask = False
-	
+
         # reset status
         env.state={}
 
         # flag if function will be executed
         self.succ_flag = 0
-        
+
 	# example function
         @state(provides="custom.something1")
         def succ():
@@ -62,14 +62,14 @@ class TestStateDecorator(unittest.TestCase):
         env.warn_only = False
         env.state_warn_only = True
         env.state_ask = False
-	
+
         # reset status
         env.state={}
 
         # flag if function will be executed
         self.succ1_flag = 0
         self.succ2_flag = 0
-        
+
 	# example functions
         @state(provides="custom.something1")
         def succ1():
@@ -93,7 +93,7 @@ class TestStateDecorator(unittest.TestCase):
         env.state_ask = False
         # task will be re-executed
         env.state_skip = False
-	
+
         # reset status
         env.state={}
 
@@ -101,7 +101,7 @@ class TestStateDecorator(unittest.TestCase):
         self.flag1 = 0
         self.flag2 = 0
         self.flag3 = 0
-        
+
 	# example functions
         @state(provides="entry1")
         def fun1():
@@ -130,7 +130,7 @@ class TestStateDecorator(unittest.TestCase):
         env.state_ask = False
         # task will be re-executed
         env.state_skip = True
-	
+
         # reset status
         env.state={}
 
@@ -138,7 +138,7 @@ class TestStateDecorator(unittest.TestCase):
         self.flag1 = 0
         self.flag2 = 0
         self.flag3 = 0
-        
+
 	# example functions
         @state(provides="entry1")
         def fun1():
@@ -167,7 +167,7 @@ class TestStateDecorator(unittest.TestCase):
         env.state_ask = False
         # task will be re-executed
         env.state_skip = True
-	
+
         # reset status
         env.state={}
 
@@ -175,7 +175,7 @@ class TestStateDecorator(unittest.TestCase):
         self.flag1 = 0
         self.flag2 = 0
         self.flag3 = 0
-        
+
 	# example functions
         @state(provides=["entry1","entry2"])
         def fun1():
@@ -204,7 +204,7 @@ class TestStateDecorator(unittest.TestCase):
         env.state_ask = False
         # task won't be re-executed
         env.state_skip = True
-	
+
         # reset status
         env.state={}
 
@@ -212,7 +212,7 @@ class TestStateDecorator(unittest.TestCase):
         self.flag1 = 0
         self.flag2 = 0
         self.flag3 = 0
-        
+
 	# example functions
         @state(provides=["entry1","entry2"])
         def fun1():
@@ -240,15 +240,15 @@ class TestStateDecorator(unittest.TestCase):
         env.state_warn_only = False
         env.state_ask = False
         # task will be re-executed
-        env.state_skip = False
-	
+        env.state_skip = True
+
         # reset status
         env.state={}
 
         # flag if function will be executed
         self.flag1 = 0
         self.flag2 = 0
-        
+
 	# function will abort
         @state(depends=["entry1","entry2"])
         def fun1():
@@ -273,14 +273,14 @@ class TestStateDecorator(unittest.TestCase):
         env.state_ask = False
         # task will be re-executed
         env.state_skip = True
-	
+
         # reset status
         env.state={}
 
         # flag if function will be executed
         self.flag1 = 0
         self.flag2 = 0
-        
+
 	# function will abort
         @state(depends=["entry1","entry2"])
         def fun1():
@@ -313,7 +313,7 @@ class TestStateDecorator(unittest.TestCase):
 
         # flag if function will be executed
         self.flag1 = 0
-        
+
 	# function will abort
         @state(provides=["cheese"], depends=["entry1","entry2"])
         def fun1():
@@ -328,5 +328,5 @@ class TestStateDecorator(unittest.TestCase):
 
         # function should be called, so flag shouldn't be changed
         assert self.flag1 == 0
-        
+
 

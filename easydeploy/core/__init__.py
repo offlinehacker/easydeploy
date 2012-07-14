@@ -143,6 +143,10 @@ class state(object):
             if not env.state.has_key(env.host):
                 env.state[env.host]=[]
 
+            # if function doesn't have provides, skip it
+            if not self.provides:
+                warn("This task doesn't provide anything")
+
             # Check if task should be skipped if it is already provided
             # with what state provides
             if hasattr(env,"state_skip") and env.state_skip:
@@ -151,8 +155,7 @@ class state(object):
                     return
 
                 # if function doesn't have provides, skip it
-                if self.provides == []:
-                    warn("This task doesn't provide anything")
+                if not self.provides:
                     return
 
             # check that all dependences are installed
