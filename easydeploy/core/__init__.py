@@ -82,27 +82,27 @@ def decpass(key, keypass=None):
 class state(object):
     """
     Decorator for handling states and its errors.
-    
+
     .. note::
-    
+
         Its main task is to provide a system for checking for provided dependencies
         among different tasks. So if some task fails, execution can continue and
         tasks that depends on whatever failed task provides won't run.
-    
+
     .. warning::
-    
+
         This decorator will not install task dependencies instead of you, its main
         task is to track which tasks has completed and which not.
-    
+
     ``env.state`` list tells which states for which hosts are already provided.
     It is a simple dictionary of ``{"host_name": {"provided1", "provided2",...}}``
 
     * Set ``env.state_warn_only`` to only warn about failed state.
     * Set ``env.state_ask`` if you want to be asked if you want to continue on failed state.
     * if ``env.state_skip`` is set tasks gets skipped when provided states are in env.state list
-    
+
     Example::
-    
+
         @task
         @state(provides="apt.update")
         def apt_update():
@@ -118,6 +118,17 @@ class state(object):
     """
 
     def __init__(self, provides=[], depends=[]):
+        """
+        Decorator input parameters
+
+        :param provides: List of provided items
+        :type provides: list, str
+        :param depends: List of dependecies
+        :type depends: list, str
+
+        :returns: None
+        """
+
         self.depends = depends if not isinstance(depends,basestring) else [depends]
         self.provides = provides if not isinstance(provides,basestring) else [provides]
 
@@ -178,7 +189,7 @@ class state(object):
 
                 # update status if task successfully completed
                 if successfullyExecuted == 1:
-                    env.state[env.host]+= self.provides
+                    env.state[env.host]= list(set(env.state[env.host]+self.provides))
 
         wrapper.func_name = fn.func_name
         if hasattr(fn, '__name__'):
@@ -187,23 +198,43 @@ class state(object):
             wrapper.__doc__ = fn.__doc__
         if hasattr(fn, '__module__'):
             wrapper.__module__ = fn.__module__
-            
+
         return wrapper
-    
+
+def provide(provides=[]):
+    """
+    Provides someting and saves it to env.state
+
+    :param provides: List of items to provide
+    :type provides: list
+
+    :returns: None
+    """
+
+    # add state dictionary (happens first time only)
+    if not hasattr(env,"state"):
+        env.state={}
+    # add empty list for saving installed stuff (happens first time only)
+    if not env.state.has_key(env.host):
+        env.state[env.host]=[]
+    provides=provides if not isinstance(provides,basestring) else [provides]
+
+    env.state[env.host]= list(set(env.state[env.host]+provides))
+
 def get_envvar(varname, section=None, envdefault=None):
     """
     Function for smarter retrival of variables from ``env``, with section support
     and defaults
-    
+
     .. note::
-        First it searches for variable ``varname`` in ``env[section]`` in 
-        case section is specified, if not found it searches for ``varname`` in 
-        ``env``, if not found and ``envdefault`` specified it tries to search 
-        ``envdefault`` in ``env``. 
-        
+        First it searches for variable ``varname`` in ``env[section]`` in
+        case section is specified, if not found it searches for ``varname`` in
+        ``env``, if not found and ``envdefault`` specified it tries to search
+        ``envdefault`` in ``env``.
+
         ``env.section`` overrides section specified to this function
     """
-    
+
     return (env.get("section") \
                 and isinstance(env.get(env.get("section")),dict) \
                 and env.get(env.get("section"))[varname]) or \
@@ -250,7 +281,6 @@ def execute_tasks(tasks):
     :type tasks: list, dict
 
     :returns: None
-    :rtype: None
     """
 
     if isinstance(tasks, dict):
