@@ -29,21 +29,22 @@ from cuisine import dir_ensure
 from easydeploy.core import err
 from core import apt_get
 from core import add_startup
+from core import get_envvar
 
 import core
 
 @task
 def install_lxc():
     """Installs LXC virtualization"""
-    
+
     apt_get("lxc vlan bridge-utils")
     uncomment('/etc/default/lxc', '#RUN=yes', use_sudo=True)
 
 @task
 def create_instance(name, template="ubuntu", config=None, autostart=False):
     """
-    Creates new lxc instance. 
-    
+    Creates new lxc instance.
+
     .. note::
         Variables for this function cannot be set using env
 
@@ -70,10 +71,10 @@ def create_instance(name, template="ubuntu", config=None, autostart=False):
 
     #Change root password
     sudo("chroot /var/lib/lxc/%(name)s/rootfs/ passwd" % opts)
-    
+
     if opts["autostart"]:
         toggle_bootstart(name)
-        
+
 @task
 def install_instance(path):
     """Installs instance from already created instance archive"""
@@ -84,22 +85,22 @@ def install_instance(path):
         with cd(spath[0]):
             local("tar -cpvzf /tmp/container.tar.gz %s" % spath[1], use_sudo=True)
         put("/tmp/container.tar.gz", "/tmp/container.tar.gz")
-    
+
     sudo("mv /tmp/container.tar.gz /var/lib/lxc")
     with cd("/var/lib/lxc"):
         sudo("tar -xvf container.tar.gz")
         sudo("rm container.tar.gz")
-        
+
     local("rm /tmp/container.tar.gz", use_sudo=True)
 
 @task
 def destroy_instance(name):
     """
     Destroys lxc instance
-    
+
     .. note::
         Variables for this function cannot be set using env
-    
+
     :param name: Lxc instance name
     :type name: str
     """
@@ -116,10 +117,10 @@ def destroy_instance(name):
 def toggle_bootstart(name):
     """
     Toggles bootstart of lxc instance
-    
+
     .. note::
         Variables for this function cannot be set using env
-    
+
     :param name: Lxc instance name
     :type name: str
     """

@@ -7,7 +7,7 @@ from fabric.contrib.files import uncomment
 from fabric.operations import prompt
 
 from easydeploy.core import err, state
-from easydeploy.core import upload_template_jinja2, get_envvar
+from easydeploy.core import upload_template_jinja2, get_envvar, provide
 
 @task
 @state(depends="apt_update")
@@ -30,12 +30,15 @@ def apt_get(pkg_name, repo=None):
         sudo("apt-add-repository -y %(repo)s"% opts)
 
     if repo:
-        sudo("apt-get update")
+        with settings(state_skip=False):
+            sudo("apt-get update")
 
     if isinstance(opts["pkg_name"], basestring):
         sudo("apt-get -yq install %(pkg_name)s" % opts)
+        provide("apt_get.".join(opts["pkg_name"].split()))
     else:
         sudo("apt-get -yq install", " ".join(opts["pkg_name"]))
+        provide("apt_get.".join(opts["pkg_name"]))
 
 @task
 @state(provides="apt_update")
@@ -67,12 +70,12 @@ def add_startup(service=None):
         sudo("update-rc.d %(service)s defaults" % opts)
 
 @task
-def create_accounts(users=None, default_password=None, 
+def create_accounts(users=None, default_password=None,
                     groups=None, admin=False):
     """
     Create accounts with same settings
-    
-    default section: accounts
+
+    Default section: accounts
 
     :param users: List of users
     :type users: str, list
@@ -85,10 +88,10 @@ def create_accounts(users=None, default_password=None,
     """
 
     opts = dict(
-        users=users 
-                or get_envvar('usernames',section='accounts') 
+        users=users
+                or get_envvar('usernames',section='accounts')
                 or err("Users must be set"),
-        default_password=default_password 
+        default_password=default_password
                 or get_envvar('default_password',section='accounts')
                 or err("Default_password must be set"),
         groups=groups
@@ -178,6 +181,8 @@ def configure_ufw(rules=None):
     """
     Configure Uncomplicated Firewall.
 
+    Default section: network.ufw
+
     :param rules: list of firewall rules
     :type rules: list, str
     """
@@ -185,7 +190,8 @@ def configure_ufw(rules=None):
     # reset rules so we start from scratch
     sudo('ufw --force reset')
 
-    rules = rules or env.rules or err("env.rules must be set")
+    rules = rules or get_envvar("rules", section="network.ufw") \
+                     or err("env.rules must be set")
     for rule in rules:
         sudo(rule)
 
@@ -195,24 +201,29 @@ def configure_ufw(rules=None):
 
 @task
 def disable_root_login():
-    """Disable `root` login for even more security. Access to `root` account
+    """
+    Disable `root` login for even more security. Access to `root` account
     is now possible by first connecting with your dedicated maintenance
-    account and then running ``sudo su -``."""
+    account and then running ``sudo su -``.
+    """
     sudo('passwd --lock root')
 
 @task
-def set_hostname(server_ip=None, hostname=None):
+def set_hostname(ip=None, hostname=None):
     """
     Set server's hostname
 
-    :param server_ip: ip
-    :type server_ip: str
+    Default section: network
+
+    :param ip: ip
+    :type ip: str
     :param hostname: hostname
     :type hostname: str
     """
 
     opts = dict(
-        server_ip=server_ip or env.server_ip or err("env.server_ip must be set"),
+        ip=ip or get_envvar("ip",section="network")
+              or err("env.server_ip must be set"),
         hostname=hostname or env.hostname or err("env.hostname must be set"),
     )
 
@@ -225,12 +236,15 @@ def set_system_time(timezone=None):
     """
     Sets system timezone and installs ntp
 
+    Default section: network
+
     :param timezone: Timezone, for example ``/usr/share/zoneinfo/UTC``
     :type timezone: str
     """
 
     opts = dict(
-        timezone=timezone or env.get('timezone') or '/usr/share/zoneinfo/UTC',
+        timezone=timezone or get_envvar("hostname", section="network")
+                          or '/usr/share/zoneinfo/UTC',
     )
 
     # set timezone
@@ -244,12 +258,15 @@ def install_unattended_upgrades(email=None):
     """
     Configure Ubuntu to automatically install security updates.
 
+    Default section: admin
+
     :param email: email where you want to receive info about updates
     :type email: str
     """
 
     opts = dict(
-        email=email or env.get('email') or err('env.email must be set'),
+        email=email or get_envvar("email", section="admin")
+                    or err('env.email must be set'),
     )
 
     apt_get('unattended-upgrades')
