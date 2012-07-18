@@ -19,8 +19,6 @@ def apt_get(pkg_name, repo=None):
     :type pkg_name: list, str
     :param repo: Optional repository to use
     :type repo: str
-
-    .. autojinja:: test.tpl
     """
 
     opts = dict(
@@ -163,7 +161,7 @@ def create_account(username, default_password=None, groups=[],
     provide("account.%(username)s" % opts)
 
 @task
-@state(provide="network.sshd.x11forwarding")
+@state(provides="network.sshd.x11forwarding")
 def sshd_x11forwarding():
     """Enables X11 forwarding for ssh client and server"""
     sed('/etc/ssh/sshd_config',
@@ -187,7 +185,7 @@ def sshd_x11forwarding():
         use_sudo=True)
 
 @task
-@state(provide="network.sshd.security")
+@state(provides="network.sshd.security")
 def sshd_secure():
     """Security harden sshd."""
 
@@ -243,7 +241,7 @@ def disable_root_login():
     sudo('passwd --lock root')
 
 @task
-@state(provide="admin.hostname")
+@state(provides="admin.hostname")
 def set_hostname(ip=None, hostname=None):
     """
     Set server's hostname
@@ -335,8 +333,6 @@ def install_network_config(path=None):
     startup.
 
     .. note:: This function won't restart your network by itself.
-
-    .. autojinja:: /etc/network/interfaces
 
     :param path: Path to your template folder
     :type path: str

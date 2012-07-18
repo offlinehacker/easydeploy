@@ -227,7 +227,7 @@ def provide(provides=[]):
 
     # add empty list for saving installed stuff (happens first time only)
     if not env.state.has_key(env.host):
-    env.state[env.host]=[]
+        env.state[env.host]=[]
     provides=provides if not isinstance(provides,basestring) else [provides]
 
     env.state[env.host]= list(set(env.state[env.host]+provides))
