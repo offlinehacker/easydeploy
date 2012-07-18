@@ -240,13 +240,21 @@ def get_envvar(varname, section=None):
     Function for smarter retrival of variables from ``env``, with section support
     and defaults
 
-    .. note::
-        First it searches for variable ``varname`` in ``env[section]`` in
-        case section is specified, if not found it searches for ``varname`` in
-        ``env``, if not found and ``envdefault`` specified it tries to search
-        ``envdefault`` in ``env``.
+    First it searches for variable ``varname`` in ``env.settings[section]`` in
+    case section is specified, if not found it searches for ``varname`` in
+    ``env.settings``. Multiple sections can be specified delimited by comma.
+    In that case it first searches for ``varname`` in first section and than
+    in other sections::
 
-        ``env.section`` overrides section specified to this function
+        >>> env.settings={"admin":{"email":"a"}, "info":{"email":"b"}}
+        >>> get_envvar("email","admin,info")
+        a
+
+        >>> env.settings={"admin":{}, "email":"b"}
+        >>> get_envvar("email","admin")
+        b
+
+    ``env.section`` overrides section specified to this function
 
     :param varname: Name of variable to take from env or its sections
     :type varname: str
@@ -257,17 +265,19 @@ def get_envvar(varname, section=None):
     :returns: Value of env variable
     """
 
+    se= env.get("settings") or err("env.settings not set")
+
     # Tries to get varname from section defined in env.section or
     # from the first section that matches those listed in section
     # or from envdefault or just by taking value from varname in env.
     return (env.get("section") \
-                and isinstance(env.get(env.get("section")),dict) \
-                and env.get(env.get("section")).get(varname)) or \
+                and isinstance(se.get(env.get("section")),dict) \
+                and se.get(env.get("section")).get(varname)) or \
            (section \
                 #Takes first section that matches
-                and next(iter([env.get(j).get(varname) for j in section.split(",") if \
-                     isinstance(env.get(j),dict) and env.get(j).get(varname)][0])), None)  or \
-            env.get(varname)
+                and next(iter([se.get(j).get(varname) for j in section.split(",") if \
+                     isinstance(se.get(j),dict) and se.get(j).get(varname)]), None))  or \
+            se.get(varname)
 
 def execute_tasks(tasks):
     """

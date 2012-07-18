@@ -2,13 +2,13 @@ from __future__ import with_statement
 
 import unittest
 
-from easydeploy.core import state
-
 from fabric.api import local, settings, abort, run, cd
 from fabric.contrib.console import confirm
 from fabric.context_managers import show
 from fabric.api import env
 
+from easydeploy.core import state
+from easydeploy.core import get_envvar
 
 class TestStateDecorator(unittest.TestCase):
     def testUnsatisfiedDeps(self):
@@ -329,4 +329,26 @@ class TestStateDecorator(unittest.TestCase):
         # function should be called, so flag shouldn't be changed
         assert self.flag1 == 0
 
+class TestGetEnvVar(unittest.TestCase):
+    def testGetFromRoot(self):
+        env.settings={"email":"a", "admin":{}}
+        self.assertEqual(get_envvar("email", "admin"), "a")
 
+    def testGetFromSection(self):
+        env.settings={"email":"a", "admin":{"email":"b"}}
+        self.assertEqual(get_envvar("email", "admin"), "b")
+        env.settings={"email":"a", "admin":{}}
+        self.assertEqual(get_envvar("email", "admin"), "a")
+
+    def testOverrideSection(self):
+        with settings(section="info"):
+            env.settings={"email":"a", "admin":{"email":"b"}, "info":{"email":"c"}}
+            self.assertEqual(get_envvar("email", "admin"), "c")
+
+    def testGetFromPrioritySection(self):
+        env.settings={"email":"a", "admin":{"email":"b"}, "info":{"email":"c"}}
+        self.assertEqual(get_envvar("email", "admin,info"), "b")
+        env.settings={"email":"a", "admin":{}, "info":{"email":"c"}}
+        self.assertEqual(get_envvar("email", "admin,info"), "c")
+        env.settings={"email":"a", "admin":{}, "info":{}}
+        self.assertEqual(get_envvar("email", "admin,info"), "a")
