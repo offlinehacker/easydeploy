@@ -10,7 +10,7 @@ from easydeploy.core import err, state
 from easydeploy.core import upload_template_jinja2, get_envvar, provide
 
 @task
-@state(depends="apt_update")
+@state(depends="admin.update")
 def apt_get(pkg_name, repo=None):
     """
     Install package
@@ -19,6 +19,8 @@ def apt_get(pkg_name, repo=None):
     :type pkg_name: list, str
     :param repo: Optional repository to use
     :type repo: str
+
+    .. autojinja:: test.tpl
     """
 
     opts = dict(
@@ -35,18 +37,19 @@ def apt_get(pkg_name, repo=None):
 
     if isinstance(opts["pkg_name"], basestring):
         sudo("apt-get -yq install %(pkg_name)s" % opts)
-        provide("apt_get.".join(opts["pkg_name"].split()))
+        provide("admin.packages.".join(opts["pkg_name"].split()))
     else:
         sudo("apt-get -yq install", " ".join(opts["pkg_name"]))
-        provide("apt_get.".join(opts["pkg_name"]))
+        provide("admin.packages.".join(opts["pkg_name"]))
 
 @task
-@state(provides="apt_update")
+@state(provides="admin.update")
 def apt_update():
     "Updates apt"
     sudo("apt-get -y update")
 
 @task
+@state(depends="admin.update", provides="admin.upgrade")
 def apt_upgrade():
     "Upgrades apt"
     sudo("apt-get -y upgrade")
@@ -66,8 +69,10 @@ def add_startup(service=None):
     if isinstance(opts["sevice"], (tuple, list, dict, set)):
         for service in opts["service"]:
             sudo("update-rc.d %s defaults", service)
+            provide("startup.%s" % service)
     else:
         sudo("update-rc.d %(service)s defaults" % opts)
+        provide("startup.%(service)s" % opts)
 
 @task
 def create_accounts(users=None, default_password=None,
@@ -75,11 +80,11 @@ def create_accounts(users=None, default_password=None,
     """
     Create accounts with same settings
 
-    Default section: accounts
+    Default section: accounts, admin
 
     :param users: List of users
     :type users: str, list
-    :param default_password: Their default password
+    :param default_password: Their default password ( in ``admin`` )
     :type default_password: str
     :param groups: List or string of comma separated groups
     :type groups: list, str
@@ -92,7 +97,7 @@ def create_accounts(users=None, default_password=None,
                 or get_envvar('usernames',section='accounts')
                 or err("Users must be set"),
         default_password=default_password
-                or get_envvar('default_password',section='accounts')
+                or get_envvar('default_password',section='accounts,admin')
                 or err("Default_password must be set"),
         groups=groups
                 or get_envvar('groups',section='accounts'),
@@ -155,8 +160,35 @@ def create_account(username, default_password=None, groups=[],
     # set default password for initial login
     sudo('echo "%(username)s:%(default_password)s" | chpasswd' % opts)
 
+    provide("account.%(username)s" % opts)
+
 @task
-def harden_sshd():
+@state(provide="network.sshd.x11forwarding")
+def sshd_x11forwarding():
+    """Enables X11 forwarding for ssh client and server"""
+    sed('/etc/ssh/sshd_config',
+        '#X11Forwarding yes',
+        'X11Forwarding yes',
+        use_sudo=True)
+
+    sed('/etc/ssh/sshd_config',
+        '#X11DisplayOffset 10',
+        'X11DisplayOffset 10',
+        use_sudo=True)
+
+    sed('/etc/ssh/sshd_config',
+        '#   ForwardX11 yes',
+        '   ForwardX11 yes',
+        use_sudo=True)
+
+    sed('/etc/ssh/sshd_config',
+        '#   ForwardX11Trusted yes',
+        '   ForwardX11Trusted yes',
+        use_sudo=True)
+
+@task
+@state(provide="network.sshd.security")
+def sshd_secure():
     """Security harden sshd."""
 
     # Disable password authentication
@@ -172,16 +204,17 @@ def harden_sshd():
         use_sudo=True)
 
 @task
-def install_ufw(rules=None):
-    """Install and configure Uncomplicated Firewall."""
+def install_ufw():
+    """Installs Uncomplicated Firewall."""
     apt_get('ufw')
 
 @task
+@state(depends="admin.package.ufw",provides="network.ufw")
 def configure_ufw(rules=None):
     """
-    Configure Uncomplicated Firewall.
+    Configures Uncomplicated Firewall.
 
-    Default section: network.ufw
+    Default section: ufw,network
 
     :param rules: list of firewall rules
     :type rules: list, str
@@ -190,7 +223,7 @@ def configure_ufw(rules=None):
     # reset rules so we start from scratch
     sudo('ufw --force reset')
 
-    rules = rules or get_envvar("rules", section="network.ufw") \
+    rules = rules or get_envvar("rules", section="ufw,network") \
                      or err("env.rules must be set")
     for rule in rules:
         sudo(rule)
@@ -200,6 +233,7 @@ def configure_ufw(rules=None):
     sudo('ufw status verbose')
 
 @task
+@state(provides="admin.disabled_root_login")
 def disable_root_login():
     """
     Disable `root` login for even more security. Access to `root` account
@@ -209,6 +243,7 @@ def disable_root_login():
     sudo('passwd --lock root')
 
 @task
+@state(provide="admin.hostname")
 def set_hostname(ip=None, hostname=None):
     """
     Set server's hostname
@@ -224,7 +259,8 @@ def set_hostname(ip=None, hostname=None):
     opts = dict(
         ip=ip or get_envvar("ip",section="network")
               or err("env.server_ip must be set"),
-        hostname=hostname or env.hostname or err("env.hostname must be set"),
+        hostname=hostname or get_envvar("hostname",section="network")
+              or err("env.hostname must be set"),
     )
 
     sudo('echo "\n%(server_ip)s %(hostname)s" >> /etc/hosts' % opts)
@@ -232,18 +268,19 @@ def set_hostname(ip=None, hostname=None):
     sudo('hostname %(hostname)s' % opts)
 
 @task
+@state(provides="admin.system_time")
 def set_system_time(timezone=None):
     """
     Sets system timezone and installs ntp
 
-    Default section: network
+    Default section: admin
 
     :param timezone: Timezone, for example ``/usr/share/zoneinfo/UTC``
     :type timezone: str
     """
 
     opts = dict(
-        timezone=timezone or get_envvar("hostname", section="network")
+        timezone=timezone or get_envvar("timezone", section="admin")
                           or '/usr/share/zoneinfo/UTC',
     )
 
@@ -254,6 +291,7 @@ def set_system_time(timezone=None):
     apt_get('ntp')
 
 @task
+@state(provides="admin.unattended_upgrades")
 def install_unattended_upgrades(email=None):
     """
     Configure Ubuntu to automatically install security updates.
@@ -290,9 +328,15 @@ def install_unattended_upgrades(email=None):
            use_sudo=True)
 
 @task
+@state(provides="network")
 def install_network_config(path=None):
     """
-    Installs network configuration, using jinja2 template.
+    Installs network configuration, using jinja2 template and adds networking to
+    startup.
+
+    .. note:: This function won't restart your network by itself.
+
+    .. autojinja:: /etc/network/interfaces
 
     :param path: Path to your template folder
     :type path: str
@@ -304,3 +348,4 @@ def install_network_config(path=None):
 
     upload_template_jinja2("%(path)/etc/network/interfaces" % opts,
                            "/etc/network/interfaces")
+    add_startup("networking")

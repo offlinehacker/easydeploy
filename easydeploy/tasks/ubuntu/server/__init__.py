@@ -25,15 +25,15 @@ def raid_monitoring(email=None):
     """
     Configure monitoring of our RAID-1 field. If anything goes wrong,
     send an email!
-    
-    default env section: raid
-    
+
+    Default section: admin
+
     :param email: Email to send reports
     :type email: str
     """
     opts = dict(
-        email=email 
-                or get_envvar('email',section='raid')  
+        email=email
+                or get_envvar('email',section='admin')
                 or err('Email must be set'),
     )
 
@@ -49,15 +49,15 @@ def install_sendmail(email=None):
     """
     Prepare a localhost SMTP server for sending out system notifications
     to admins
-    
-    default env section: sendmail
-    
+
+    Default section: admin
+
     :param email: Email to send reports
     :type email: str
     """
     opts = dict(
-        email=email 
-                or get_envvar('email',section='sendmail') 
+        email=email
+                or get_envvar('email',section='admin')
                 or err('Email must be set'),
     )
 
@@ -78,7 +78,7 @@ def install_dnsmasq():
 def configure_dnsmasq(path=None):
     """
     Configures local dns server
-    
+
     :param path: Template folder
     :type path: str
     """
@@ -94,15 +94,15 @@ def configure_dnsmasq(path=None):
 def install_rkhunter(email=None):
     """
     Install and configure RootKit Hunter
-    
-    default env section: rkhunter
-    
+
+    Default section: admin
+
     :param email: Email to send reports
     :type email: str
     """
     opts = dict(
-        email=email 
-                or get_envvar('email',section='rkhunter') 
+        email=email
+                or get_envvar('email',section='admin')
                 or err('Email must be set'),
     )
 
@@ -120,10 +120,18 @@ def install_rkhunter(email=None):
 
 @task
 def install_mysql(password=None):
-    """Install MySQL database server."""
+    """
+    Install MySQL database server
+
+    Default section: mysql
+
+    :param password: Root mysql password ( ``envdefault="default_password"`` )
+    :type password: str
+    """
+
     opts = dict(
-        password=password 
-                or get_envvar('password',section='mysql','default_password') 
+        password=password
+                or get_envvar('password',section='mysql',envdefault='default_password')
                 or err("No password for mysql set")
     )
 
@@ -134,16 +142,16 @@ def install_mysql(password=None):
 
     # install MySQL along with php drivers for it
     apt_get('mysql-server mysql-client')
- 
-@task   
+
+@task
 def configure_mysql_backups(password=None, time=None):
     """Example task for mysql backups"""
     opts = dict(
-        password=password 
-                or get_envvar('password',section='mysql','default_password')
+        password=password
+                or get_envvar('password',section='mysql',envdefault='default_password')
                 or err("No password for mysql set"),
-        time=time 
-                or get_envvar('time',section='mysql') 
+        time=time
+                or get_envvar('time',section='mysql')
                 or err("No backup time for mysql set")
     )
     # configure daily dumps of all databases

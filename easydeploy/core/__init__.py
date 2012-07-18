@@ -217,14 +217,25 @@ def provide(provides=[]):
     # add state dictionary (happens first time only)
     if not hasattr(env,"state"):
         env.state={}
+
+    # Check if task should be skipped if it is already provided
+    # with what state provides
+    if hasattr(env,"state_skip") and env.state_skip:
+        if all(x in env.state[env.host] for x in provides):
+            puts("This task has already been executed, so we decide to skip it")
+            return
+
     # add empty list for saving installed stuff (happens first time only)
     if not env.state.has_key(env.host):
-        env.state[env.host]=[]
+    env.state[env.host]=[]
     provides=provides if not isinstance(provides,basestring) else [provides]
 
     env.state[env.host]= list(set(env.state[env.host]+provides))
 
-def get_envvar(varname, section=None, envdefault=None):
+def unprovide(provides=[]):
+    env.state[env.host]= filter(lambda el: el not in provides, env.state[env.host])
+
+def get_envvar(varname, section=None):
     """
     Function for smarter retrival of variables from ``env``, with section support
     and defaults
@@ -236,15 +247,27 @@ def get_envvar(varname, section=None, envdefault=None):
         ``envdefault`` in ``env``.
 
         ``env.section`` overrides section specified to this function
+
+    :param varname: Name of variable to take from env or its sections
+    :type varname: str
+    :param section: Name of section to lookup or comma separated, prioritized
+                    from more to less importancy sections to lookup
+    :type section: str
+
+    :returns: Value of env variable
     """
 
+    # Tries to get varname from section defined in env.section or
+    # from the first section that matches those listed in section
+    # or from envdefault or just by taking value from varname in env.
     return (env.get("section") \
                 and isinstance(env.get(env.get("section")),dict) \
-                and env.get(env.get("section"))[varname]) or \
-            (section \
-                and isinstance(env.get(section),dict) \
-                and env.get(section)[varname]) or \
-            env.get(envdefault) or env.get(varname)
+                and env.get(env.get("section")).get(varname)) or \
+           (section \
+                #Takes first section that matches
+                and next(iter([env.get(j).get(varname) for j in section.split(",") if \
+                     isinstance(env.get(j),dict) and env.get(j).get(varname)][0])), None)  or \
+            env.get(varname)
 
 def execute_tasks(tasks):
     """

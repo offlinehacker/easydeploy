@@ -30,12 +30,16 @@ setup(name='easydeploy.fabfile',
       packages=find_packages(exclude=['ez_setup']),
       include_package_data=True,
       zip_safe=False,
+      dependency_links =
+            ["https://github.com/offlinehacker/fabric/tarball/master#egg=fabric-1.4.5beta"],
       install_requires=[
           # list project dependencies
           'Fabric',
           'cuisine',
           'setuptools',
-          'nose'
+          'nose',
+          'sphinx',
+          'sphinxcontrib-jinjadomain'
       ],
       test_suite="easydeploy.tests",
       )

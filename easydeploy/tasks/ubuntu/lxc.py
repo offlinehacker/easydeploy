@@ -27,13 +27,16 @@ from fabric.operations import prompt
 from cuisine import dir_ensure
 
 from easydeploy.core import err
-from core import apt_get
-from core import add_startup
-from core import get_envvar
+from easydeploy.core import apt_get
+from easydeploy.core import add_startup
+from easydeploy.core import get_envvar
+from easydeploy.core import state
+from easydeploy.core import provide
 
 import core
 
 @task
+@state(provides="virtualization.lxc")
 def install_lxc():
     """Installs LXC virtualization"""
 
@@ -41,6 +44,7 @@ def install_lxc():
     uncomment('/etc/default/lxc', '#RUN=yes', use_sudo=True)
 
 @task
+@state(depends="virtualization.lxc")
 def create_instance(name, template="ubuntu", config=None, autostart=False):
     """
     Creates new lxc instance.
@@ -75,8 +79,11 @@ def create_instance(name, template="ubuntu", config=None, autostart=False):
     if opts["autostart"]:
         toggle_bootstart(name)
 
+    provide("virtualization.lxc.containers.%(name)s" % opts)
+
 @task
-def install_instance(path):
+@state(depends="virtualization.lxc")
+def install_instance(path, name):
     """Installs instance from already created instance archive"""
     if path.endswith("tar.gz"):
         put(path, "/tmp/container.tar.gz")
@@ -92,6 +99,7 @@ def install_instance(path):
         sudo("rm container.tar.gz")
 
     local("rm /tmp/container.tar.gz", use_sudo=True)
+    provide("virtualization.lxc.containers." + name)
 
 @task
 def destroy_instance(name):
