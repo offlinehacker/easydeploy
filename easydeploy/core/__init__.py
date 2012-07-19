@@ -79,6 +79,43 @@ def decpass(key, keypass=None):
     RC4.decrypt(md5.new(opts["keypass"]).digest())
     return RC4.decrypt(key)
 
+def save_status():
+    status = yaml.dump((env.state))
+    totalPath = os.path.realpath(__file__)
+    directory, fname = os.path.split(totalPath)
+    saveName = directory+".fabstate"
+    # 
+    while True:
+        try:
+            file(saveName,"wb").write(status)
+            puts("Status saved successfully", flush=True)
+            break
+        except IOError,e:
+            if hasattr(env,"state_ask") and env.state_ask:
+                if not confirm(("Error when saving to file %s: %s (%i)\n" % (saveName, e.args[1], e.args[0]))+
+                                "Do you want to specify new path (unless status won't saved)?"):
+                    warn("Status didn't saved.")
+                    break
+                else:
+                    # get new path
+                    while True:
+                        saveName = raw_input("Please specify absolute path where status of easydeploy can be saved"+
+                                                  " or write \"abort\" if you want to abort saving status\n"+
+                                             "eg. /home/john/.fabstate or ~/.fabstate : ")
+                        if saveName == "abort" or len(saveName) > 0 and (saveName[0] == "/" or saveName[0] == "~")):
+                            break
+                    # break also second while
+                    if saveName == "abort":
+                        break
+            else:
+                warn("Error when saving to file %s: %s (%i)" % (saveName, e.args[1], e.args[0])
+                break
+    return
+
+def load_status():
+    
+    return
+
 class state(object):
     """
     Decorator for handling states and its errors.
