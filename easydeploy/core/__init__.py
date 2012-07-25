@@ -1,4 +1,4 @@
-import md5
+import md5, yaml, os
 #import hashlib
 
 from Crypto.Cipher import ARC4
@@ -79,42 +79,99 @@ def decpass(key, keypass=None):
     RC4.decrypt(md5.new(opts["keypass"]).digest())
     return RC4.decrypt(key)
 
-def save_status():
-    status = yaml.dump((env.state))
+def save_status(fileName=""):
+    # dump state variable
+    status = yaml.dump((env.state if hasattr(env, "state") else None,
+                        env.config if hasattr(env, "config") else None))
+    # get current directory
     totalPath = os.path.realpath(__file__)
-    directory, fname = os.path.split(totalPath)
-    saveName = directory+".fabstate"
-    # 
+    directory = os.path.split(totalPath)[0]+"/"
+    # full path of the file
+    saveName = directory+fileName+".fabstate"
+    # saving loop 
     while True:
         try:
             file(saveName,"wb").write(status)
             puts("Status saved successfully", flush=True)
             break
         except IOError,e:
-            if hasattr(env,"state_ask") and env.state_ask:
-                if not confirm(("Error when saving to file %s: %s (%i)\n" % (saveName, e.args[1], e.args[0]))+
-                                "Do you want to specify new path (unless status won't saved)?"):
+            errmessage = "Error when saving to file %s: %s (%i)" % (saveName, e.args[1], e.args[0])
+            if not (hasattr(env,"state_ask") and env.state_ask):
+                warn(errmessage)
+                break
+            else:
+                if not confirm(errmessage+"\nDo you want to specify new path (unless status won't saved)?"):
                     warn("Status didn't saved.")
                     break
                 else:
                     # get new path
+                    saveName_previous = saveName
                     while True:
-                        saveName = raw_input("Please specify absolute path where status of easydeploy can be saved"+
-                                                  " or write \"abort\" if you want to abort saving status\n"+
-                                             "eg. /home/john/.fabstate or ~/.fabstate : ")
-                        if saveName == "abort" or len(saveName) > 0 and (saveName[0] == "/" or saveName[0] == "~")):
+                        saveName = raw_input(("Please choose one of the following options:\n"+
+                                              "    Enter absolute path where status of easydeploy can be saved\n"+
+                                              "        eg. /home/john/%s.fabstate or ~/%s.fabstate\n"+
+                                              "    \"print\" if you want that status will be printed\n"+
+                                              "        Note: status can be very long at big configuration\n"+
+                                              "    \"abort\" if you want to abort saving status\n"+
+                                              ": ") % (fileName, fileName)
+                                             )
+                        # if match expected input then we have expected input (break the asking loop)
+                        if saveName == "print" or saveName == "abort" or len(saveName) > 0 and (saveName[0] == "/" or saveName[0] == "~"):
                             break
-                    # break also second while
+
+                    if saveName == "print":
+                        puts("\n============ CUT HERE =================\n"+status+"\n============ CUT HERE =================\n")
+                        saveName = saveName_previous
+                        # saftly don't break saving loop if scrollback for printed status is too short
+
+                    # break also saving loop
                     if saveName == "abort":
                         break
-            else:
-                warn("Error when saving to file %s: %s (%i)" % (saveName, e.args[1], e.args[0])
-                break
     return
 
-def load_status():
-    
+def load_status(fileName=""):
+    # get current directory
+    totalPath = os.path.realpath(__file__)
+    directory = os.path.split(totalPath)[0]+"/"
+    # full path of the file
+    saveName = directory+fileName+".fabstate"
+
+    while True:
+        try:
+            # read the file
+            content = file(saveName,"rb").read()
+            # convert content to python variable
+            state, config = yaml.load(content)
+            if state != None:
+                env.state = state
+            if config != None:
+                env.config = config
+
+            puts("Status loaded successfully", flush=True)
+            break
+
+        except IOError,e:
+            errmessage = "Error when reading file %s: %s (%i)\n" % (saveName, e.args[1], e.args[0])
+            if not (hasattr(env,"state_ask") and env.state_ask):
+                abort(errmessage)
+            else:
+                warn(errmessage)
+                if not confirm("Do you want to specify new path (unless new status will be used)?"):
+                    puts("New status used.", flush=True)
+                    break
+                else:
+                    # get new path
+                    saveName = raw_input(("Enter absolute path of easydeploy\n"+
+                                          "    eg. /home/john/%s.fabstate or ~/%s.fabstate\n"+
+                                          ": ") % (fileName, fileName))
+        except yaml.parser.ParserError, e:
+            abort("yaml.parser.ParserError: "+str(e.context)+"\n"+
+                  str(e.context_mark)+"\n"+
+                  str(e.problem)+"\n"+
+                  str(e.problem_mark))
+            
     return
+
 
 class state(object):
     """

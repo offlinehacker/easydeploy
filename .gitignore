@@ -1,12 +1,14 @@
+#virtualenv
 bin/*
 easydeploy.fabfile.egg-info/*
 include/*
 lib/*
 local
-*.pyc
 man/*
-easydeploy/fabfile/.ropeproject/*
-build/*
+
+
+#python
+*.pyc
 
 #eclipse
 .project
@@ -14,7 +16,16 @@ build/*
 .settings
 
 #vim
+*.swp
 tags
 
+#sphinx
 build/*
+
+#easydeploy saved statuses
+easydeploy/core/*.fabstate
+easydeploy/core/*.fabstate.fabstate_backup
+
+#wtf
+easydeploy/fabfile/.ropeproject/*
 dist/*
