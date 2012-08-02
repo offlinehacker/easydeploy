@@ -6,6 +6,7 @@ from fabric.api import env
 from fabric.api import execute
 
 from easydeploy.core import state, execute_tasks
+from easydeploy.core import load_status, save_status
 
 import easydeploy.tasks
 
@@ -53,3 +54,4 @@ def deploy_server_basic():
     execute(deploy_basic) 
     with settings(**server_basic):
         execute_tasks(env.tasks)
+
