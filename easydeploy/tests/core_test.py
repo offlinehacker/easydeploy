@@ -1,6 +1,7 @@
 from __future__ import with_statement
 
 import unittest
+import os
 
 from fabric.api import local, settings, abort, run, cd
 from fabric.contrib.console import confirm
@@ -341,7 +342,7 @@ class TestGetEnvVar(unittest.TestCase):
         self.assertEqual(get_envvar("email", "admin"), "a")
 
     def testOverrideSection(self):
-        with settings(section="info"):
+        with settings(group="info"):
             env.settings={"email":"a", "admin":{"email":"b"}, "info":{"email":"c"}}
             self.assertEqual(get_envvar("email", "admin"), "c")
 
@@ -352,3 +353,29 @@ class TestGetEnvVar(unittest.TestCase):
         self.assertEqual(get_envvar("email", "admin,info"), "c")
         env.settings={"email":"a", "admin":{}, "info":{}}
         self.assertEqual(get_envvar("email", "admin,info"), "a")
+
+class TestUploadTemplateJinja2(unittest.TestCase):
+    def write_template(self, fname, contents):
+        f=open(fname,"w")
+        f.write(contents)
+        f.close
+
+    def test_upload(self):
+        template="""{{get_envvar('test','test')}}"""
+        self.ret=""
+
+        import easydeploy.core
+
+        def dummy_put(local_path,remote_path,use_sudo):
+            print local_path.getvalue()
+            self.ret=local_path.getvalue()
+
+        self.write_template("template.tpl", template)
+        env.path="."
+        env.settings={"test":{"test":"test2"}}
+        easydeploy.core.put= dummy_put
+        easydeploy.core.upload_template_jinja2("template.tpl", "/tmp/template.tpl")
+
+        assert self.ret=="test2"
+
+        os.unlink("template.tpl")

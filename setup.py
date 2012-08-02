@@ -39,7 +39,9 @@ setup(name='easydeploy.fabfile',
           'setuptools',
           'nose',
           'sphinx',
-          'sphinxcontrib-jinjadomain'
+          'sphinxcontrib-jinjadomain',
+          'pyyaml',
+          'jinja2'
       ],
       test_suite="easydeploy.tests",
       )

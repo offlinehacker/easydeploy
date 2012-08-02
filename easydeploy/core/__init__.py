@@ -1,14 +1,18 @@
 import md5, yaml, os
 #import hashlib
 
+from StringIO import StringIO
+
 from Crypto.Cipher import ARC4
-from fabric.api import env, execute, settings
+from fabric.api import env, execute, settings, put
 from fabric.contrib.files import upload_template
 from fabric.utils import abort
 from fabric.utils import warn
 from fabric.utils import error
 from fabric.utils import puts
 from fabric.contrib.console import confirm
+
+from jinja2 import Environment, FileSystemLoader
 
 def err(msg):
     """
@@ -36,7 +40,17 @@ def upload_template_jinja2(template, destination, use_sudo=True):
     :returns: Whatever upload_template returns
     """
 
-    return upload_template(template, destination, context=env, use_sudo=use_sudo, use_jinja=True)
+    env.get("path") or err("env.path not set")
+
+    jenv= Environment(loader=FileSystemLoader(env.path))
+    jenv.globals["get_envvar"]= get_envvar
+    text= jenv.get_template(template).render(**env.get("settings") or {})
+
+    put(
+        local_path=StringIO(text),
+        remote_path= destination,
+        use_sudo=use_sudo
+    )
 
 def encpass(key, keypass=None):
     """
@@ -88,7 +102,7 @@ def save_status(fileName=""):
     directory = os.path.split(totalPath)[0]+"/"
     # full path of the file
     saveName = directory+fileName+".fabstate"
-    # saving loop 
+    # saving loop
     while True:
         try:
             file(saveName,"wb").write(status)
@@ -169,7 +183,7 @@ def load_status(fileName=""):
                   str(e.context_mark)+"\n"+
                   str(e.problem)+"\n"+
                   str(e.problem_mark))
-            
+
     return
 
 
@@ -237,7 +251,6 @@ class state(object):
             if not hasattr(env,"state"):
                 env.state={}
             # add empty list for saving installed stuff (happens first time only)
-            import pdb;pdb.set_trace()
             if not env.state.has_key(env.host):
                 env.state[env.host]=[]
 
@@ -287,7 +300,6 @@ class state(object):
 
                 # update status if task successfully completed
                 if successfullyExecuted == 1:
-                    import pdb;pdb.set_trace()
                     env.state[env.host]= list(set(env.state[env.host]+self.provides))
 
         wrapper.func_name = fn.func_name
@@ -342,10 +354,10 @@ def provide(provides=[]):
 def unprovide(provides=[]):
     env.state[env.host]= filter(lambda el: el not in provides, env.state[env.host])
 
-def get_envvar(varname, section=None, envdefault=None, group=None):
+def get_envvar(varname, group=None, envdefault=None, domain=None):
     """
     Function for smarter retrival of variables from ``env``, with support of
-    groups, sections and defaults. It gives user an option to organize
+    domains, groups and defaults. It gives user an option to organize
     settings in a tree.
 
     .. note::
@@ -375,52 +387,52 @@ def get_envvar(varname, section=None, envdefault=None, group=None):
             You have to store all variables in ``env.settings``, not in ``env``.
 
         Lets say that you want to organize your options just a little bit. Well
-        what you could do is to make an organization in a groups::
+        what you could do is to make an organization in a domains::
 
-            >>> env.settings={"admin":{"email":"somemail@somegroup"}}
+            >>> env.settings={"admin":{"email":"somemail@somedomain"}}
 
         Well now how to get that variable out is to issue something like::
 
             >>> env.get("settings").get("admin").get("email")
-            somemail@somegroup
+            somemail@somedomain
 
         Pretty long line of code i would say. That's where ``get_envvar`` could
         help you::
 
             >>> get_envvar("email", "admin")
-            somemail@somegroup
+            somemail@somedomain
 
-        Well let's say that sometimes, some option exists in some group, but
-        sometimes it does no, and you want to get option from multiple groups,
+        Well let's say that sometimes, some option exists in some domain, but
+        sometimes it does no, and you want to get option from multiple domains,
         but prioritized. This could be usefull for example if you sometimes want
         to have task speciffic options, but sometimes not::
 
-            >>> env.settings={"admin":{"email":"somemail@somegroup"},"sometask":{"email":"othermail@somegroup"}}
+            >>> env.settings={"admin":{"email":"somemail@somedomain"},"sometask":{"email":"othermail@somedomain"}}
             >>> get_envvar("email","sometask,admin")
-            othermail@somegroup
+            othermail@somedomain
 
-        In this case get_envvar will first look in ``sometask`` group and then in
-        ``admin`` group. And of course::
+        In this case get_envvar will first look in ``sometask`` domain and then in
+        ``admin`` domain. And of course::
 
-            >>> env.settings={"admin":{"email":"somemail@somegroup"}}
+            >>> env.settings={"admin":{"email":"somemail@somedomain"}}
             >>> get_envvar("email", "sometask,admin")
-            somemail@somegroup
+            somemail@somedomain
 
-        Sometimes you want to have subgroups of groups::
+        Sometimes you want to have subdomains of domains::
 
-            >>> env.settings={"admin":{"contacts":{"email":"somemail@somegroup"}}}
+            >>> env.settings={"admin":{"contacts":{"email":"somemail@somedomain"}}}
             >>> get_envvar("email","admin.contacts")
-            somemail@somegroup
+            somemail@somedomain
 
-            >>> env.settings={"admin":{"contacts":{"email":"somemail@somegroup"}},"admin2":{"email":"othermail@somegroup"}}
+            >>> env.settings={"admin":{"contacts":{"email":"somemail@somedomain"}},"admin2":{"email":"othermail@somedomain"}}
             >>> get_envvar("email","admin.contacts,admin2")
-            somemail@somegroup
+            somemail@somedomain
 
         It works in as many depths as you want::
 
-            >>> env.settings={"group1":{"group2":{"group3":{"email":"somemail@somegroup"}}}}
-            >>> get_envvar("email","group1.group2.group3")
-            somemail@somegroup
+            >>> env.settings={"domain1":{"domain2":{"domain3":{"email":"somemail@somedomain"}}}}
+            >>> get_envvar("email","domain1.domain2.domain3")
+            somemail@somedomain
 
         Let's say that you want to have some variable name that is default and
         stored in ``env.settings``, for example ``default_password``, and still
@@ -434,46 +446,46 @@ def get_envvar(varname, section=None, envdefault=None, group=None):
             >>> get_envvar("pass", "sometask", envdefault="default_password")
             pass1
 
-        In some cases you don't only have options for single group, but you want
-        to have distinct options for different groups. For example you have to
+        In some cases you don't only have options for single domain, but you want
+        to have distinct options for different domains. For example you have to
         install your app per user basis. In this cases it's usually good to have
-        your options in something like ``env.settings.$group``, where group is
+        your options in something like ``env.settings.$domain``, where domain is
         for example username::
 
-            >>> env.settings={"somegroup":{"usertask":{"password":"somepass"}}}
-            >>> get_envvar("password", "usertask", group="somegroup")
+            >>> env.settings={"somedomain":{"usertask":{"password":"somepass"}}}
+            >>> get_envvar("password", "usertask", domain="somedomain")
             somepass
 
     **Basic way of operation:**
 
-        - if group and section are provided it searches for all comma sepeated
-          sections in a group located in settings for the section that has varname set.
-        - if not found and group is set it searches for varname in group.
-        - if not found and section is set it searches for all comma separated
-        - sections in a settings for the section that has varname set.
+        - if domain and group are provided it searches for all comma sepeated
+          groups in a domain located in settings for the group that has varname set.
+        - if not found and domain is set it searches for varname in domain.
+        - if not found and group is set it searches for all comma separated
+        - groups in a settings for the group that has varname set.
         - if not found it searches for envdefault in settings and
         - at last if that is not found it searches for varname in settings
 
-    :param varname: Name of variable to take from env or its sections
+    :param varname: Name of variable to take from env or its groups
     :type varname: str
-    :param section: Name of section to lookup or comma separated, prioritized
-                    from more to less importancy sections to lookup.
+    :param group: Name of group to lookup or comma separated, prioritized
+                    from more to less importancy groups to lookup.
                     Can also be in a dot separated format to lookup tree organized
-                    sections.
-    :type section: str
-    :param envdefault: Default envvariable name if not found in sections/groups
-    :type envdefault: str
-    :param group: Name of group to search in.
-                   Can also be in a dot separated format to lookup tree organized
-                   groups.
+                    groups.
     :type group: str
+    :param envdefault: Default envvariable name if not found in groups/domains
+    :type envdefault: str
+    :param domain: Name of domain to search in.
+                   Can also be in a dot separated format to lookup tree organized
+                   domains.
+    :type domain: str
 
     :returns: Value of setting variable
     """
 
     se= env.get("settings") or err("env.settings not set")
-    section= env.get("section") or section
     group= env.get("group") or group
+    domain= env.get("domain") or domain
 
     # first element of dot separated list
     f = lambda x: x.split(".")[0]
@@ -483,21 +495,21 @@ def get_envvar(varname, section=None, envdefault=None, group=None):
     intree = lambda p,t: p and ( f(p) and (f(p) in t) and isinstance(t,dict) \
                      and intree(o(p),t[f(p)]) ) or (not p and t) or {}
 
-    # checks if varname v in section t is in tree t and gets its value
+    # checks if varname v in group t is in tree t and gets its value
     insects= lambda s,t,v: next(iter([intree(sect, t).get(v) for sect \
                            in s.split(",") if intree(sect, t).get(v)]), None)
 
-    # if group and section are provided it searches for all comma sepeated
-    # sections in a group located in settings for the section that has varname set.
-    # if not found and group is set it searches for varname in group.
-    # if not found and section is set it searches for all comma separated
-    # sections in a settings for the section that has varname set.
+    # if domain and group are provided it searches for all comma sepeated
+    # groups in a domain located in settings for the group that has varname set.
+    # if not found and domain is set it searches for varname in domain.
+    # if not found and group is set it searches for all comma separated
+    # groups in a settings for the group that has varname set.
     # if not found it searches for envdefault in settings and
     # at last if that is not found it searches for varname in settings.
-    return (group and section and
-            insects(section,intree(group,se),varname)) or \
-           (group and intree(group,se).get(varname)) or \
-           (section and insects(section,se,varname)) or \
+    return (domain and group and
+            insects(group,intree(domain,se),varname)) or \
+           (domain and intree(domain,se).get(varname)) or \
+           (group and insects(group,se,varname)) or \
             se.get(envdefault) or se.get(varname)
 
 def execute_tasks(tasks):
