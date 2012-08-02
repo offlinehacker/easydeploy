@@ -91,7 +91,7 @@ class state(object):
 
     .. warning::
 
-        This decorator will not install task dependencies instead of you, its main
+        This decorator will not run task dependencies instead of you, its main
         task is to track which tasks has completed and which not.
 
     ``env.state`` list tells which states for which hosts are already provided.
@@ -135,11 +135,15 @@ class state(object):
     def __call__(self, fn):
         self.fn=fn
         def wrapper(*args):
+            if hasattr(env,"state_ignore") and env.state_ignore:
+                return fn(*args)
+
             continoueFlag = 1
             # add state dictionary (happens first time only)
             if not hasattr(env,"state"):
                 env.state={}
             # add empty list for saving installed stuff (happens first time only)
+            import pdb;pdb.set_trace()
             if not env.state.has_key(env.host):
                 env.state[env.host]=[]
 
@@ -150,16 +154,13 @@ class state(object):
             # Check if task should be skipped if it is already provided
             # with what state provides
             if hasattr(env,"state_skip") and env.state_skip:
-                if all(x in env.state[env.host] for x in self.provides):
+                if self.provides and \
+                    all(x in env.state[env.host] for x in self.provides):
                     puts("This task has already been executed, so we decide to skip it")
                     return
 
-                # if function doesn't have provides, skip it
-                if not self.provides:
-                    return
-
             # check that all dependences are installed
-            if not all(x in env.state[env.host] for x in self.depends):
+            if self.depends and (not all(x in env.state[env.host] for x in self.depends)):
                 # if state_warn_only is set skip that package
                 if hasattr(env,"state_warn_only") and env.state_warn_only:
                     continoueFlag = 0
@@ -192,6 +193,7 @@ class state(object):
 
                 # update status if task successfully completed
                 if successfullyExecuted == 1:
+                    import pdb;pdb.set_trace()
                     env.state[env.host]= list(set(env.state[env.host]+self.provides))
 
         wrapper.func_name = fn.func_name
@@ -214,70 +216,195 @@ def provide(provides=[]):
     :returns: None
     """
 
+    if hasattr(env,"state_ignore") and env.state_ignore:
+        return
+
     # add state dictionary (happens first time only)
     if not hasattr(env,"state"):
         env.state={}
 
+    provides=provides if not isinstance(provides,basestring) else [provides]
+
     # Check if task should be skipped if it is already provided
     # with what state provides
     if hasattr(env,"state_skip") and env.state_skip:
-        if all(x in env.state[env.host] for x in provides):
+        if provides and all(x in env.state[env.host] for x in provides):
+            puts("This task has already been executed, so we decide to skip it")
+            return
+
+    # Check if task should be skipped if it is already provided
+    # with what state provides
+    if hasattr(env,"state_skip") and env.state_skip:
+        if provides and all(x in env.state[env.host] for x in provides):
             puts("This task has already been executed, so we decide to skip it")
             return
 
     # add empty list for saving installed stuff (happens first time only)
     if not env.state.has_key(env.host):
         env.state[env.host]=[]
-    provides=provides if not isinstance(provides,basestring) else [provides]
 
     env.state[env.host]= list(set(env.state[env.host]+provides))
 
 def unprovide(provides=[]):
     env.state[env.host]= filter(lambda el: el not in provides, env.state[env.host])
 
-def get_envvar(varname, section=None):
+def get_envvar(varname, section=None, envdefault=None, group=None):
     """
-    Function for smarter retrival of variables from ``env``, with section support
-    and defaults
+    Function for smarter retrival of variables from ``env``, with support of
+    groups, sections and defaults. It gives user an option to organize
+    settings in a tree.
 
-    First it searches for variable ``varname`` in ``env.settings[section]`` in
-    case section is specified, if not found it searches for ``varname`` in
-    ``env.settings``. Multiple sections can be specified delimited by comma.
-    In that case it first searches for ``varname`` in first section and than
-    in other sections::
+    .. note::
+            To understand how this function work you have to understand the
+            philosophy behind it.
 
-        >>> env.settings={"admin":{"email":"a"}, "info":{"email":"b"}}
-        >>> get_envvar("email","admin,info")
-        a
+    **Philosophy:**
 
-        >>> env.settings={"admin":{}, "email":"b"}
-        >>> get_envvar("email","admin")
-        b
+        When you are deploying systems you usually have to deal with a lot of input
+        variables to your tasks and its templates. Usually you would stick everything
+        to `env`, but this way you would end up with a deploy system with long and
+        wierd variable names. This may sometimes be okay, but with systems deployment
+        it usually gets a nightmare. At the same time you sometimes want to have an
+        option to use default variable or task speciffic ones, based on some
+        heuristics.
 
-    ``env.section`` overrides section specified to this function
+        This function tries to satisfy all the needs that you will end up when
+        writing your deployment tasks and gives you a tool to organize your input.
+
+    **Usage:**
+
+        Because we don't want to stick everything to `env` we decided to stick
+        everything to `env.settings`, that's because `env` has a lot of settings
+        in it and you could easily override some needed option.
+
+        .. note::
+            You have to store all variables in ``env.settings``, not in ``env``.
+
+        Lets say that you want to organize your options just a little bit. Well
+        what you could do is to make an organization in a groups::
+
+            >>> env.settings={"admin":{"email":"somemail@somegroup"}}
+
+        Well now how to get that variable out is to issue something like::
+
+            >>> env.get("settings").get("admin").get("email")
+            somemail@somegroup
+
+        Pretty long line of code i would say. That's where ``get_envvar`` could
+        help you::
+
+            >>> get_envvar("email", "admin")
+            somemail@somegroup
+
+        Well let's say that sometimes, some option exists in some group, but
+        sometimes it does no, and you want to get option from multiple groups,
+        but prioritized. This could be usefull for example if you sometimes want
+        to have task speciffic options, but sometimes not::
+
+            >>> env.settings={"admin":{"email":"somemail@somegroup"},"sometask":{"email":"othermail@somegroup"}}
+            >>> get_envvar("email","sometask,admin")
+            othermail@somegroup
+
+        In this case get_envvar will first look in ``sometask`` group and then in
+        ``admin`` group. And of course::
+
+            >>> env.settings={"admin":{"email":"somemail@somegroup"}}
+            >>> get_envvar("email", "sometask,admin")
+            somemail@somegroup
+
+        Sometimes you want to have subgroups of groups::
+
+            >>> env.settings={"admin":{"contacts":{"email":"somemail@somegroup"}}}
+            >>> get_envvar("email","admin.contacts")
+            somemail@somegroup
+
+            >>> env.settings={"admin":{"contacts":{"email":"somemail@somegroup"}},"admin2":{"email":"othermail@somegroup"}}
+            >>> get_envvar("email","admin.contacts,admin2")
+            somemail@somegroup
+
+        It works in as many depths as you want::
+
+            >>> env.settings={"group1":{"group2":{"group3":{"email":"somemail@somegroup"}}}}
+            >>> get_envvar("email","group1.group2.group3")
+            somemail@somegroup
+
+        Let's say that you want to have some variable name that is default and
+        stored in ``env.settings``, for example ``default_password``, and still
+        have some task speciffic variables like ``password``. What you could do is::
+
+            >>> env.settings={"default_password":"pass1", "sometask":{"password":"pass2"}}
+            >>> get_envvar("pass", "sometask", envdefault="default_password")
+            pass2
+
+            >>> env.settings={"default_password":"pass2"}
+            >>> get_envvar("pass", "sometask", envdefault="default_password")
+            pass1
+
+        In some cases you don't only have options for single group, but you want
+        to have distinct options for different groups. For example you have to
+        install your app per user basis. In this cases it's usually good to have
+        your options in something like ``env.settings.$group``, where group is
+        for example username::
+
+            >>> env.settings={"somegroup":{"usertask":{"password":"somepass"}}}
+            >>> get_envvar("password", "usertask", group="somegroup")
+            somepass
+
+    **Basic way of operation:**
+
+        - if group and section are provided it searches for all comma sepeated
+          sections in a group located in settings for the section that has varname set.
+        - if not found and group is set it searches for varname in group.
+        - if not found and section is set it searches for all comma separated
+        - sections in a settings for the section that has varname set.
+        - if not found it searches for envdefault in settings and
+        - at last if that is not found it searches for varname in settings
 
     :param varname: Name of variable to take from env or its sections
     :type varname: str
     :param section: Name of section to lookup or comma separated, prioritized
-                    from more to less importancy sections to lookup
+                    from more to less importancy sections to lookup.
+                    Can also be in a dot separated format to lookup tree organized
+                    sections.
     :type section: str
+    :param envdefault: Default envvariable name if not found in sections/groups
+    :type envdefault: str
+    :param group: Name of group to search in.
+                   Can also be in a dot separated format to lookup tree organized
+                   groups.
+    :type group: str
 
-    :returns: Value of env variable
+    :returns: Value of setting variable
     """
 
     se= env.get("settings") or err("env.settings not set")
+    section= env.get("section") or section
+    group= env.get("group") or group
 
-    # Tries to get varname from section defined in env.section or
-    # from the first section that matches those listed in section
-    # or from envdefault or just by taking value from varname in env.
-    return (env.get("section") \
-                and isinstance(se.get(env.get("section")),dict) \
-                and se.get(env.get("section")).get(varname)) or \
-           (section \
-                #Takes first section that matches
-                and next(iter([se.get(j).get(varname) for j in section.split(",") if \
-                     isinstance(se.get(j),dict) and se.get(j).get(varname)]), None))  or \
-            se.get(varname)
+    # first element of dot separated list
+    f = lambda x: x.split(".")[0]
+    # other elements of dot separated list(everything, but first)
+    o = lambda x: ".".join(x.split(".")[1:])
+    # recursivly checks if path p is in tree t and gets its value
+    intree = lambda p,t: p and ( f(p) and (f(p) in t) and isinstance(t,dict) \
+                     and intree(o(p),t[f(p)]) ) or (not p and t) or {}
+
+    # checks if varname v in section t is in tree t and gets its value
+    insects= lambda s,t,v: next(iter([intree(sect, t).get(v) for sect \
+                           in s.split(",") if intree(sect, t).get(v)]), None)
+
+    # if group and section are provided it searches for all comma sepeated
+    # sections in a group located in settings for the section that has varname set.
+    # if not found and group is set it searches for varname in group.
+    # if not found and section is set it searches for all comma separated
+    # sections in a settings for the section that has varname set.
+    # if not found it searches for envdefault in settings and
+    # at last if that is not found it searches for varname in settings.
+    return (group and section and
+            insects(section,intree(group,se),varname)) or \
+           (group and intree(group,se).get(varname)) or \
+           (section and insects(section,se,varname)) or \
+            se.get(envdefault) or se.get(varname)
 
 def execute_tasks(tasks):
     """
