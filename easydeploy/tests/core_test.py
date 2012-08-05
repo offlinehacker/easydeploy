@@ -335,24 +335,51 @@ class TestGetEnvVar(unittest.TestCase):
         env.settings={"email":"a", "admin":{}}
         self.assertEqual(get_envvar("email", "admin"), "a")
 
-    def testGetFromSection(self):
+    def testGetFromGroup(self):
         env.settings={"email":"a", "admin":{"email":"b"}}
         self.assertEqual(get_envvar("email", "admin"), "b")
         env.settings={"email":"a", "admin":{}}
         self.assertEqual(get_envvar("email", "admin"), "a")
 
-    def testOverrideSection(self):
+    def testOverrideGroup(self):
         with settings(group="info"):
             env.settings={"email":"a", "admin":{"email":"b"}, "info":{"email":"c"}}
             self.assertEqual(get_envvar("email", "admin"), "c")
 
-    def testGetFromPrioritySection(self):
+    def testGetFromDomain(self):
+        env.settings={"root":{ "admin":{"email":"a"}},"offlinehacker":{ "admin":{"email":"b"}}}
+        self.assertEqual(get_envvar("email", "admin", domain="root"), "a")
+        self.assertEqual(get_envvar("email", "admin", domain="offlinehacker"), "b")
+
+    def testOverrideDomain(self):
+        with settings(domain="offlinehacker"):
+            env.settings={"root":{"email":"b"}, "offlinehacker":{"email":"c"}}
+            self.assertEqual(get_envvar("email", domain="root"), "c")
+
+    def testGetFromPriorityGroup(self):
         env.settings={"email":"a", "admin":{"email":"b"}, "info":{"email":"c"}}
         self.assertEqual(get_envvar("email", "admin,info"), "b")
         env.settings={"email":"a", "admin":{}, "info":{"email":"c"}}
         self.assertEqual(get_envvar("email", "admin,info"), "c")
         env.settings={"email":"a", "admin":{}, "info":{}}
         self.assertEqual(get_envvar("email", "admin,info"), "a")
+
+    def testGetFromSubgroupGroup(self):
+        env.settings={"group1":{"group11":{"val":"a"},
+                                "group12":{"val":"b"}},
+                      "group2":{"group21":{"val":"c"},
+                                "group22":{"val":"d"}}}
+        self.assertEqual(get_envvar("val","group2.group21"), "c")
+
+    def testGetFromSubgroupPriorityGroup(self):
+        env.settings={"email":"a", "group1":{"admin":{"email":"b"}},
+                      "group2":{"info":{"email":"c"}}}
+        self.assertEqual(get_envvar("email", "group1.admin,group2.info"), "b")
+        env.settings={"email":"a", "group1":{"admin":{}},
+                      "group2":{"info":{"email":"c"}}}
+        self.assertEqual(get_envvar("email", "group1.admin,group2.info"), "c")
+        env.settings={"email":"a", "group1":{"admin":{}}}
+        self.assertEqual(get_envvar("email", "group1.admin,group2.info"), "a")
 
 class TestUploadTemplateJinja2(unittest.TestCase):
     def write_template(self, fname, contents):
