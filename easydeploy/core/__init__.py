@@ -94,6 +94,45 @@ def decpass(key, keypass=None):
     return RC4.decrypt(key)
 
 def save_status(fileName=""):
+    """
+    Saves status of easydeploy to fabstate file.
+    
+    :parm fileName: name of fabstate file.\n
+    Example: ``easydeploy/core/snake.fabstate`` if ``fileName = "snake"``\n
+    or\n
+    ``easydeploy/core/.fabstate`` if ``fileName = ""``\n
+    :type fileName: str
+    
+    :returns: None
+    
+    Example (status is saved at ``easydeploy/core/.fabstate``)::
+    
+        from easydeploy.core import load_status, save_status
+        #
+        # There can be code which doesn't using state decorator.
+        #
+        # Load previous status::
+        load_status()
+        #
+        # Do additional operations and save new status::
+        #
+        # save status to fabstate file at easydeploy/core/.fabstate
+        save_status()
+    
+    Example (status is saved at ``easydeploy/core/snake.fabstate``)::
+    
+        from easydeploy.core import load_status, save_status
+        #
+        # There can be code which doesn't using state decorator.
+        #
+        # Load previous status::
+        load_status("snake")
+        #
+        # Do additional operations and save new status::
+        #
+        # save status to fabstate file at easydeploy/core/snake.fabstate
+        save_status("snake")
+    """
     # dump state variable
     status = yaml.dump((env.state if hasattr(env, "state") else None,
                         env.config if hasattr(env, "config") else None))
@@ -144,6 +183,45 @@ def save_status(fileName=""):
     return
 
 def load_status(fileName=""):
+    """
+    Loads status of easydeploy to fabstate file.
+    
+    :parm fileName: name of fabstate file.\n
+    Example: ``easydeploy/core/snake.fabstate`` if ``fileName = "snake"``\n
+    or\n
+    ``easydeploy/core/.fabstate`` if ``fileName = ""``\n
+    :type fileName: str
+    
+    :returns: None
+    
+    Example (status is loaded from ``easydeploy/core/.fabstate``)::
+    
+        from easydeploy.core import load_status, save_status
+        #
+        # There can be code which doesn't using state decorator.
+        #
+        # Load previous status::
+        load_status()
+        #
+        # Do additional operations and save new status::
+        #
+        # save status to fabstate file at easydeploy/core/.fabstate
+        save_status()
+    
+    Example (status is loaded from ``easydeploy/core/snake.fabstate``)::
+    
+        from easydeploy.core import load_status, save_status
+        #
+        # There can be code which doesn't using state decorator.
+        #
+        # Load previous status::
+        load_status("snake")
+        #
+        # Do additional operations and save new status::
+        #
+        # save status to fabstate file at easydeploy/core/snake.fabstate
+        save_status("snake")
+    """
     # get current directory
     totalPath = os.path.realpath(__file__)
     directory = os.path.split(totalPath)[0]+"/"

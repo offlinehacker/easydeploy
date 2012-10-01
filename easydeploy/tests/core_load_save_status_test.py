@@ -61,7 +61,7 @@ class TestLoadSaveStatus(unittest.TestCase):
         # flag if function will be executed
         self.flag1 = 0
 
-	# example function
+        # example function
         @state(provides="custom.something")
         def fun1():
             self.flag1 = 1
@@ -95,7 +95,7 @@ class TestLoadSaveStatus(unittest.TestCase):
         # flag if function will be executed
         self.flag1 = 0
 
-	# example function
+        # example function
         @state(provides="custom.something")
         def fun1():
             self.flag1 = 1
@@ -130,7 +130,7 @@ class TestLoadSaveStatus(unittest.TestCase):
         self.flag1 = 0
         self.flag2 = 0
 
-	# example function
+        # example function
         @state(provides="custom.something")
         def fun1():
             self.flag1 = 1
@@ -164,7 +164,7 @@ class TestLoadSaveStatus(unittest.TestCase):
         self.flag1 = 0
         self.flag2 = 0
 
-	# example function
+        # example function
         @state(provides="custom.something")
         def fun1():
             self.flag1 = 1
@@ -202,7 +202,7 @@ class TestLoadSaveStatus(unittest.TestCase):
 #        self.flag2 = 0
 #        self.flag3 = 0
 #
-#	# example function
+#        # example function
 #        @state(provides="custom.something")
 #        def fun1():
 #            self.flag1 = 1
